@@ -1,6 +1,9 @@
 import fs from "fs";
 import path from "path";
 import Document from "../models/Document.js";
+import User from "../models/User.js";
+import Activity from "../models/Activity.js";
+
 import { logActivity } from "../utils/logger.js";
 
 // ✅ Upload document (Client or Staff)
@@ -130,20 +133,51 @@ export const updateDocumentStatus = async (req, res) => {
   }
 };
 
-// ✅ Dashboard stats (Staff only)
+
+
+// ✅ Dashboard statistics with real DB counts
 export const getDashboardStats = async (req, res) => {
   try {
-    const totalDocs = await Document.countDocuments();
-    const pendingDocs = await Document.countDocuments({
+    // Total docs
+    const totalDocuments = await Document.countDocuments();
+
+    // Pending Review
+    const pendingReview = await Document.countDocuments({
       status: "Pending Review",
     });
-    const approvedDocs = await Document.countDocuments({ status: "Approved" });
 
-    res.json({ totalDocs, pendingDocs, approvedDocs });
+    // Compliance Related
+    const complianceRelated = await Document.countDocuments({
+      complianceRelated: true,
+    });
+
+    // Archived
+    const archived = await Document.countDocuments({
+      archived: true,
+    });
+
+    // Due This Week (example: docs with dueDate within next 7 days)
+    const today = new Date();
+    const nextWeek = new Date();
+    nextWeek.setDate(today.getDate() + 7);
+
+    const dueThisWeek = await Document.countDocuments({
+      dueDate: { $gte: today, $lte: nextWeek },
+    });
+
+    res.json({
+      totalDocuments,
+      pendingReview,
+      complianceRelated,
+      archived,
+      dueThisWeek,
+    });
   } catch (err) {
-    res.status(500).json({ message: "Failed to fetch dashboard stats" });
+    console.error("Error fetching dashboard stats:", err);
+    res.status(500).json({ message: "Error fetching stats", error: err.message });
   }
 };
+
 
 // ✅ Recent activities (Staff only, show latest logs)
 export const getRecentActivities = async (req, res) => {
@@ -152,13 +186,72 @@ export const getRecentActivities = async (req, res) => {
       await import("../models/Activity.js")
     ).default
       .find()
-      .populate("user", "email role")
-      .populate("document", "name type status")
-      .sort({ timestamp: -1 })
+      .populate("user", "email role")           // staff/client who did the action
+      .populate("targetClient", "email role")   // the recipient client (if any)
+      .populate("document", "name type status") // document info
+      .sort({ createdAt: -1 })
       .limit(20);
 
     res.json(activities);
   } catch (err) {
+    console.error("Error fetching activities:", err);
     res.status(500).json({ message: "Failed to fetch activities" });
+  }
+};
+
+
+// Staff sends document to a specific client
+export const sendDocumentToClient = async (req, res) => {
+  try {
+    const { clientId, name, type } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "File is required" });
+    }
+
+    // validate client
+    const client = await User.findById(clientId);
+    if (!client || client.role !== "Client") {
+      return res.status(400).json({ message: "Invalid client" });
+    }
+
+    const document = await Document.create({
+      name,
+      type,
+      size: (req.file.size / 1024 / 1024).toFixed(2) + " MB",
+      status: "Pending Review",
+      fileUrl: req.file.path,
+      uploadedBy: req.user._id,   // staff
+      client: client._id,         // assigned client
+    });
+
+    // log activity
+    await Activity.create({
+      user: req.user._id,
+      action: "SENT_TO_CLIENT",
+      document: document._id,
+      targetClient: client._id,
+    });
+
+    res.status(201).json({ message: "Document sent to client", document });
+  } catch (err) {
+    console.error("Error sending document:", err);
+    res.status(500).json({ message: "Error sending document", error: err.message });
+  }
+};
+
+
+// Client fetches only documents sent to them by staff
+export const getDocumentsSentToMe = async (req, res) => {
+  try {
+    const docs = await Document.find({
+      client: req.user._id,
+      uploadedBy: { $ne: req.user._id }, // exclude self-uploads
+    }).populate("uploadedBy", "email role");
+
+    res.json(docs);
+  } catch (err) {
+    console.error("Error fetching client documents:", err);
+    res.status(500).json({ message: "Error fetching documents", error: err.message });
   }
 };

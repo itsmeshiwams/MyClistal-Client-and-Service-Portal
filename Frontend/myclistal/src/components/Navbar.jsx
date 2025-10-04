@@ -7,7 +7,7 @@ export default function Navbar() {
   return (
     <header className="flex justify-between items-center  px-6 py-4 top-0 z-10">
       <h2 className="text-2xl font-bold text-gray-900">
-        {user?.role === "Client" ? "Welcome, Client Dashboard" : "Welcome, Staff Dashboard"}
+        {user?.role === "Client" ? "Client" : "Staff "}
       </h2>
       <div className="flex items-center gap-5">
         <div className="relative">

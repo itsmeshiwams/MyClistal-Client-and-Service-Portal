@@ -17,8 +17,16 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/documents"
+        element={
+          <ProtectedRoute allowedRoles={["Client"]}>
+            <Documents />
+          </ProtectedRoute>
+        }
+      />
+      {/* <Route path="/documents" element={<Documents />} /> */}
       
-      <Route path="/documents" element={<Documents />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
