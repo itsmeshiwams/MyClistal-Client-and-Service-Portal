@@ -277,7 +277,7 @@ export default function StaffDashboard() {
         </div>
         <button
           onClick={openSendCard}
-          className="inline-flex items-center gap-2 bg-blue-800 text-white px-5 py-3 rounded-lg shadow-md text-base font-semibold hover:bg-blue-900 transition-all"
+          className="inline-flex items-center gap-2 bg-blue-800 cursor-pointer text-white px-5 py-3 rounded-lg shadow-md text-base font-semibold hover:bg-blue-900 transition-all"
         >
           <Send size={18} /> Send To Client
         </button>
@@ -412,7 +412,7 @@ export default function StaffDashboard() {
               </div>
               <button
                 onClick={closeSendCard}
-                className="text-blue-800 hover:text-blue-600"
+                className="text-blue-800 cursor-pointer hover:text-blue-600"
               >
                 <X size={18} />
               </button>
@@ -499,14 +499,14 @@ export default function StaffDashboard() {
               <div className="flex gap-3">
                 <button
                   type="submit"
-                  className="bg-blue-800 hover:bg-blue-900 cursor-pointer text-white px-4 py-2 rounded"
+                  className="bg-blue-800 hover:bg-blue-900 cursor-pointer text-white px-4 py-2 rounded-lg"
                 >
                   Send Document
                 </button>
                 <button
                   type="button"
                   onClick={closeSendCard}
-                  className="bg-gray-100 hover:bg-gray-200 cursor-pointer text-gray-800 px-4 py-2 rounded"
+                  className="bg-gray-100 hover:bg-gray-200 cursor-pointer text-gray-800 px-4 py-2 rounded-lg"
                 >
                   Cancel
                 </button>
@@ -526,13 +526,13 @@ export default function StaffDashboard() {
           <div className="flex justify-end gap-3">
             <button
               onClick={() => setIsConfirmOpen(false)}
-              className="px-4 py-2 bg-gray-100 cursor-pointer hover:bg-gray-200 rounded"
+              className="px-4 py-2 bg-gray-100 cursor-pointer hover:bg-gray-200 rounded-lg"
             >
               Discard
             </button>
             <button
               onClick={handleConfirmSend}
-              className="px-4 py-2 bg-blue-800 cursor-pointer hover:bg-blue-900 text-white rounded"
+              className="px-4 py-2 bg-blue-800 cursor-pointer hover:bg-blue-900 text-white rounded-lg"
             >
               Send
             </button>
