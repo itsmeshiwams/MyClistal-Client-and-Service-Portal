@@ -55,7 +55,7 @@ export default function Login() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="ram@example.com"
-            className="border rounded w-full p-2 text-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="border rounded w-full p-2 text-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-800"
           />
 
           <label className="block text-lg mb-1">Password</label>
@@ -65,12 +65,12 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
-              className="border rounded w-full text-lg p-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="border rounded w-full text-lg p-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-800"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-2 top-3 cursor-pointer text-blue-700"
+              className="absolute right-2 top-3 cursor-pointer text-blue-800"
             >
               {showPassword ? (
                 <EyeSlashIcon className="h-5 w-5" />
@@ -89,7 +89,7 @@ export default function Login() {
                   value="Client"
                   checked={role === "Client"}
                   onChange={(e) => setRole(e.target.value)}
-                  className="accent-blue-600 cursor-pointer"
+                  className="accent-blue-800 cursor-pointer"
                 />
                 <span>Client</span>
               </label>
@@ -99,7 +99,7 @@ export default function Login() {
                   value="Staff"
                   checked={role === "Staff"}
                   onChange={(e) => setRole(e.target.value)}
-                  className="accent-blue-600 cursor-pointer"
+                  className="accent-blue-800 cursor-pointer"
                 />
                 <span>Staff</span>
               </label>
@@ -108,7 +108,7 @@ export default function Login() {
 
           <button
             type="submit"
-            className="bg-blue-600 text-white w-full text-lg py-2 cursor-pointer rounded hover:bg-blue-700 transition"
+            className="bg-blue-800 text-white w-full text-lg py-2 cursor-pointer rounded hover:bg-blue-900 transition"
           >
             Login
           </button>
@@ -116,7 +116,7 @@ export default function Login() {
 
         <p className="text-center text-lg text-gray-500 mt-4">
           Don't have an account?{" "}
-          <a href="/login" className="text-blue-600 hover:underline">
+          <a href="/login" className="text-blue-800 hover:underline">
             Contact Admin
           </a>
         </p>

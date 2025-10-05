@@ -22,7 +22,9 @@ export default function Dashboard() {
 
   return (
     <div className="flex">
-      <Sidebar />
+      <div className="h-screen sticky top-0">
+        <Sidebar />
+      </div>
       <div className="flex-1 flex flex-col">
         <Navbar />
         <main className="p-6  min-h-screen">

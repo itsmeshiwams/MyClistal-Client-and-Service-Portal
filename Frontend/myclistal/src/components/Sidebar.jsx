@@ -39,7 +39,7 @@ export default function Sidebar() {
               to={item.path}
               className={({ isActive }) =>
                 `flex items-center gap-3 p-3 rounded-md hover:bg-gray-100 ${
-                  isActive ? "bg-blue-100 text-blue-600 font-semibold" : "text-gray-700"
+                  isActive ? "bg-gray-100 text-blue-800 font-semibold" : "text-gray-700"
                 }`
               }
             >

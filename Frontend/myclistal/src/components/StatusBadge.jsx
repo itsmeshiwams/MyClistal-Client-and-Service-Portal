@@ -14,7 +14,7 @@ export default function StatusBadge({ status = "Pending Review" }) {
   const cls = styles[status] || "bg-gray-100 text-gray-700 border";
   return (
     <span
-      className={`inline-block text-xs font-semibold px-3 py-1 rounded-full ${cls} tracking-wide`}
+      className={`inline-block text-sm font-semibold px-3 py-1 rounded-full ${cls} tracking-wide`}
       data-testid="status-badge"
     >
       {status}

@@ -13,6 +13,7 @@ import {
   getRecentActivities,
   sendDocumentToClient,
   getDocumentsSentToMe,
+  getAllClients
 } from "../controllers/documentController.js";
 
 const router = express.Router();
@@ -25,10 +26,10 @@ router.post("/upload", protect, upload.single("file"), uploadDocument);
 // Get documents uploaded by logged-in client
 router.get("/my-documents", protect, isClient, getClientDocuments);
 
-// Download own document (Staff can access all)
+// Download own document (CLient and Staff can access )
 router.get("/:documentId/download", protect, downloadDocument);
 
-// Preview document inline
+// Preview document inline(Client and staff can access )
 router.get("/:documentId/preview", protect, previewDocument);
 
 //    STAFF ROUTES
@@ -56,5 +57,9 @@ router.post(
 
 // CLIENT → view docs sent by staff
 router.get("/sent-to-me", protect, isClient, getDocumentsSentToMe);
+
+//Get Clients(Staff Only)
+router.get("/clients", protect, isStaff, getAllClients);
+
 
 export default router;
