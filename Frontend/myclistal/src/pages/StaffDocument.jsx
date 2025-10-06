@@ -5,7 +5,6 @@ import {
   X,
   CheckCircle2,
   Send,
-  Upload,
   AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
@@ -16,10 +15,11 @@ import {
   sendDocumentToClient,
 } from "../api/documents";
 import api from "../api/api";
-import { Card } from "../components/Card";
+import { Card, CardContent } from "../components/Card";
 import DocumentRow from "../components/DocumentRow";
 import RecentActivityRow from "../components/RecentActivityRow";
 import { groupActivities } from "../utils/activityGrouping";
+import Pagination from "../components/Pagination";
 
 const TYPE_OPTIONS = [
   "PDF",
@@ -41,6 +41,7 @@ const ACTION_TYPES = [
   "REVIEWED",
   "DELETED",
   "EDITED",
+  "STATUS_CHANGE",
 ];
 
 const TIME_FILTERS = [
@@ -55,10 +56,26 @@ const TIME_FILTERS = [
 
 export default function StaffDashboard() {
   const { token } = useAuth();
+
+  // All Documents
   const [documents, setDocuments] = useState([]);
-  const [stats, setStats] = useState({});
+  const [docPagination, setDocPagination] = useState({
+    page: 1,
+    totalPages: 1,
+  });
+
+  // Recent Activities
   const [activities, setActivities] = useState([]);
   const [filteredActivities, setFilteredActivities] = useState([]);
+  const [activityPagination, setActivityPagination] = useState({
+    page: 1,
+    totalPages: 1,
+  });
+
+  // Stats
+  const [stats, setStats] = useState({});
+
+  // Loading
   const [loading, setLoading] = useState(true);
 
   // Filters
@@ -88,22 +105,27 @@ export default function StaffDashboard() {
   const [errorMessage, setErrorMessage] = useState("");
   const [shake, setShake] = useState(false);
 
-  // ✅ Load dashboard data
+  // ✅ Initial load
   useEffect(() => {
-    loadData();
+    loadInitialData();
   }, []);
 
-  const loadData = async () => {
+  const loadInitialData = async () => {
     setLoading(true);
     try {
-      const [docs, statsData, actData] = await Promise.all([
-        getAllDocuments(),
+      const [docData, statsData, actData] = await Promise.all([
+        getAllDocuments(1),
         getDashboardStats(),
-        getRecentActivities(),
+        getRecentActivities(1),
       ]);
-      setDocuments(docs || []);
+
+      setDocuments(docData.data || []);
+      setDocPagination(docData.pagination || { page: 1, totalPages: 1 });
       setStats(statsData || {});
-      setActivities(actData || []);
+
+      setActivities(actData.data || []);
+      setFilteredActivities(actData.data || []);
+      setActivityPagination(actData.pagination || { page: 1, totalPages: 1 });
     } catch (err) {
       console.error("Error loading dashboard data:", err);
     } finally {
@@ -111,7 +133,30 @@ export default function StaffDashboard() {
     }
   };
 
-  // ✅ Filters
+  // ✅ Load paginated documents
+  const loadDocuments = async (page) => {
+    try {
+      const res = await getAllDocuments(page);
+      setDocuments(res.data || []);
+      setDocPagination(res.pagination || { page: 1, totalPages: 1 });
+    } catch (err) {
+      console.error("Failed to load documents:", err);
+    }
+  };
+
+  // ✅ Load paginated recent activities
+  const loadActivities = async (page) => {
+    try {
+      const res = await getRecentActivities(page);
+      setActivities(res.data || []);
+      setFilteredActivities(res.data || []);
+      setActivityPagination(res.pagination || { page: 1, totalPages: 1 });
+    } catch (err) {
+      console.error("Failed to load activities:", err);
+    }
+  };
+
+  // ✅ Filters for Recent Activities
   const applyFilters = () => {
     let filtered = [...activities];
     const now = new Date();
@@ -124,7 +169,11 @@ export default function StaffDashboard() {
       const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       filtered = filtered.filter((a) => new Date(a.createdAt) >= start);
     } else if (timeFilter === "Yesterday") {
-      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      const start = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() - 1
+      );
       const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       filtered = filtered.filter((a) => {
         const d = new Date(a.createdAt);
@@ -157,11 +206,11 @@ export default function StaffDashboard() {
     applyFilters();
   }, [activities, actionFilter, timeFilter, customStart, customEnd]);
 
-  // ✅ Open send card
+  // ✅ Send Card Handlers
   const openSendCard = async () => {
     setIsSendCardOpen(true);
     try {
-      const res = await api.get("/document/clients");
+      const res = await api.get("http://localhost:5000/document/clients");
       setClients(res.data.clients || []);
     } catch (err) {
       console.error("Failed to fetch clients:", err);
@@ -188,10 +237,8 @@ export default function StaffDashboard() {
     );
   });
 
-  // ✅ Open confirm modal with inline validation
   const handleOpenConfirm = (e) => {
     e.preventDefault();
-
     if (!selectedClient || !selectedFile) {
       setErrorMessage("Please select a client or a file before sending");
       setShake(true);
@@ -215,17 +262,13 @@ export default function StaffDashboard() {
     setIsConfirmOpen(true);
   };
 
-  // ✅ Auto-hide error after 3 seconds
   useEffect(() => {
     if (errorMessage) {
-      const timer = setTimeout(() => {
-        setErrorMessage("");
-      }, 3000);
+      const timer = setTimeout(() => setErrorMessage(""), 3000);
       return () => clearTimeout(timer);
     }
   }, [errorMessage]);
 
-  // ✅ Confirm send
   const handleConfirmSend = async () => {
     const fd = new FormData();
     fd.append("file", confirmPayload.file);
@@ -248,7 +291,7 @@ export default function StaffDashboard() {
       setIsConfirmOpen(false);
       closeSendCard();
       setUploadProgress(0);
-      await loadData();
+      await loadDocuments(docPagination.page);
     } catch (err) {
       console.error("Error sending document:", err);
       setErrorMessage("Failed to send document. Please try again.");
@@ -270,7 +313,9 @@ export default function StaffDashboard() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Documents Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Documents Dashboard
+          </h1>
           <p className="text-gray-600 text-base mt-1">
             Manage all your important documents
           </p>
@@ -293,9 +338,11 @@ export default function StaffDashboard() {
 
       {/* Document Table + Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Document List */}
+        {/* All Documents Section */}
         <section className="lg:col-span-2 bg-white">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">All Documents</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            All Documents
+          </h2>
           <Card>
             <div className="overflow-x-auto">
               <table className="min-w-full text-base">
@@ -316,7 +363,10 @@ export default function StaffDashboard() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="6" className="text-center py-6 text-gray-500">
+                      <td
+                        colSpan="6"
+                        className="text-center py-6 text-gray-500"
+                      >
                         No documents found.
                       </td>
                     </tr>
@@ -324,15 +374,21 @@ export default function StaffDashboard() {
                 </tbody>
               </table>
             </div>
+
+            {docPagination.totalPages > 1 && (
+              <Pagination
+                pagination={docPagination}
+                onPageChange={loadDocuments}
+              />
+            )}
           </Card>
         </section>
 
-        {/* Recent Activity */}
-        <div className="bg-white ">
+        {/* Recent Activities Section */}
+        <section className="bg-white overflow-auto">
           <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
             <h2 className="font-semibold text-lg">Recent Activity</h2>
 
-            {/* Filters */}
             <div className="flex flex-wrap gap-3 items-center">
               <select
                 className="border rounded px-2 py-1 text-sm cursor-pointer"
@@ -379,14 +435,18 @@ export default function StaffDashboard() {
 
           {["Today", "Yesterday", "This Week", "This Month", "This Year"].map(
             (groupName) =>
-              grouped[groupName] && grouped[groupName].length > 0 && (
+              grouped[groupName] &&
+              grouped[groupName].length > 0 && (
                 <div key={groupName}>
                   <h3 className="text-gray-500 text-sm font-semibold">
                     {groupName}
                   </h3>
                   <ul>
                     {grouped[groupName].map((activity) => (
-                      <RecentActivityRow key={activity._id} activity={activity} />
+                      <RecentActivityRow
+                        key={activity._id}
+                        activity={activity}
+                      />
                     ))}
                   </ul>
                 </div>
@@ -394,9 +454,18 @@ export default function StaffDashboard() {
           )}
 
           {filteredActivities.length === 0 && (
-            <p className="text-gray-500 text-base">No recent activity found.</p>
+            <p className="text-gray-500 text-base">No recent activity found</p>
           )}
-        </div>
+
+          {activityPagination.totalPages > 1 && (
+            <div >
+              <Pagination
+                pagination={activityPagination}
+                onPageChange={loadActivities}
+              />
+            </div>
+          )}
+        </section>
       </div>
 
       {/* ✅ Send Card */}
@@ -405,7 +474,9 @@ export default function StaffDashboard() {
           <div className="bg-white shadow-xl rounded-lg p-5">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-xl font-semibold">Send Document to Client</h3>
+                <h3 className="text-xl font-semibold">
+                  Send Document to Client
+                </h3>
                 <p className="text-base text-gray-500">
                   Select client, file and type, then send
                 </p>
@@ -452,9 +523,7 @@ export default function StaffDashboard() {
                 <label className="block text-base font-medium mb-1">File</label>
                 <input
                   type="file"
-                  onChange={(e) =>
-                    setSelectedFile(e.target.files?.[0] || null)
-                  }
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                   className="w-full cursor-pointer border rounded p-2"
                 />
               </div>

@@ -69,8 +69,8 @@ export const downloadDocument = async (id, name, token) => {
 // ------------------ STAFF ROUTES ------------------
 
 // Staff: Get all documents
-export const getAllDocuments = async () => {
-  const res = await api.get(`${BASE_URL}/all`);
+export const getAllDocuments = async (page = 1) => {
+  const res = await api.get(`${BASE_URL}/all?page=${page}`);
   return res.data;
 };
 
@@ -87,8 +87,8 @@ export const getDashboardStats = async () => {
 };
 
 // Staff: Recent activity logs
-export const getRecentActivities = async () => {
-  const res = await api.get(`${BASE_URL}/activities/recent`);
+export const getRecentActivities = async (page=1) => {
+  const res = await api.get(`${BASE_URL}/activities/recent?page=${page}`);
   return res.data;
 };
 

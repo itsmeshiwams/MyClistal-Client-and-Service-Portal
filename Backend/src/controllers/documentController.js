@@ -11,6 +11,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadDir = path.resolve(__dirname, "../uploads");
 
+// ✅ Helper function to resolve page value (supports "next"/"prev")
+const resolvePageNumber = (queryPage, totalPages, currentPage) => {
+  if (queryPage === "next") {
+    return currentPage < totalPages ? currentPage + 1 : totalPages;
+  }
+  if (queryPage === "prev") {
+    return currentPage > 1 ? currentPage - 1 : 1;
+  }
+  const num = parseInt(queryPage);
+  return isNaN(num) || num < 1 ? 1 : num;
+};
+
+
 const getContentType = (ext) => {
   const map = {
     ".pdf": "application/pdf",
@@ -66,13 +79,47 @@ export const getClientDocuments = async (req, res) => {
 };
 
 // ✅ Staff: get all documents
+// ✅ Get all documents with pagination and next/prev switching
 export const getAllDocuments = async (req, res) => {
   try {
+    const limit = 15; // fixed page size
+    const totalCount = await Document.countDocuments();
+    const totalPages = Math.ceil(totalCount / limit);
+
+    // Determine the current page first
+    const rawPage = req.query.page || "1";
+    // If rawPage is numeric, use it first, otherwise we’ll handle next/prev after fetching current page
+    let currentPage = parseInt(rawPage);
+    if (isNaN(currentPage)) currentPage = 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    // If user requested next/prev explicitly
+    const page = resolvePageNumber(rawPage, totalPages, currentPage);
+
+    const skip = (page - 1) * limit;
+
     const docs = await Document.find()
       .populate("uploadedBy", "email role")
-      .sort({ uploadedDate: -1 });
-    res.json(docs);
+      .sort({ uploadedDate: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const nextPageNumber = page < totalPages ? page + 1 : null;
+    const prevPageNumber = page > 1 ? page - 1 : null;
+
+    res.json({
+      data: docs,
+      pagination: {
+        total: totalCount,
+        page,
+        limit,
+        totalPages,
+        nextPageNumber,
+        prevPageNumber,
+      },
+    });
   } catch (err) {
+    console.error("Error fetching documents:", err);
     res.status(500).json({ message: "Failed to fetch documents" });
   }
 };
@@ -139,6 +186,11 @@ export const updateDocumentStatus = async (req, res) => {
     const doc = await Document.findById(req.params.documentId);
     if (!doc) return res.status(404).json({ message: "Document not found" });
 
+    if (status == "Archived") {
+      doc.archived = true;
+    } else if (doc.archived && status != "Archived") {
+      doc.archived = false;
+    }
     doc.status = status;
     doc.lastModified = new Date();
     await doc.save();
@@ -182,19 +234,48 @@ export const getDashboardStats = async (req, res) => {
 // ✅ Recent activities
 export const getRecentActivities = async (req, res) => {
   try {
+    const limit = 15; // fixed page size
+    const totalCount = await Activity.countDocuments();
+    const totalPages = Math.ceil(totalCount / limit);
+
+    const rawPage = req.query.page || "1";
+    let currentPage = parseInt(rawPage);
+    if (isNaN(currentPage)) currentPage = 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const page = resolvePageNumber(rawPage, totalPages, currentPage);
+
+    const skip = (page - 1) * limit;
+
     const activities = await Activity.find()
       .populate("user", "email role")
       .populate("targetClient", "email role")
       .populate("document", "name type status")
       .sort({ createdAt: -1 })
-      .limit(20);
+      .skip(skip)
+      .limit(limit);
 
-    res.json(activities);
+    const nextPageNumber = page < totalPages ? page + 1 : null;
+    const prevPageNumber = page > 1 ? page - 1 : null;
+
+    res.json({
+      data: activities,
+      pagination: {
+        total: totalCount,
+        page,
+        limit,
+        totalPages,
+        nextPageNumber,
+        prevPageNumber,
+      },
+    });
   } catch (err) {
     console.error("Error fetching activities:", err);
     res.status(500).json({ message: "Failed to fetch activities" });
   }
 };
+
+
 
 // ✅ Staff sends document to client
 export const sendDocumentToClient = async (req, res) => {

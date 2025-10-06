@@ -28,13 +28,13 @@ export const isStaff = (req, res, next) => {
   if (req.user && req.user.role === "Staff") {
     next();
   } else {
-    res.status(403).json({ message: "Access denied. Staff only." });
+    res.status(403).json({ message: "Access denied. Staff only" });
   }
 };
 export const isClient = (req, res, next) => {
   if (req.user && req.user.role === "Client") {
     next();
   } else {
-    res.status(403).json({ message: "Access denied. Client only." });
+    res.status(403).json({ message: "Access denied. Client only" });
   }
 };
