@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Send,
   AlertTriangle,
+  Search,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -30,6 +31,15 @@ const TYPE_OPTIONS = [
   "Policy",
   "Invoice",
   "Tax Form",
+];
+
+const STATUS_OPTIONS = [
+  "Approved",
+  "Pending Review",
+  "Needs Signature",
+  "Draft",
+  "Completed",
+  "Archived",
 ];
 
 const ACTION_TYPES = [
@@ -58,11 +68,22 @@ export default function StaffDashboard() {
   const { token } = useAuth();
 
   // All Documents
+
+  // Document states
   const [documents, setDocuments] = useState([]);
   const [docPagination, setDocPagination] = useState({
     page: 1,
     totalPages: 1,
   });
+  //Documents
+  // Filters & Search
+  const [search, setSearch] = useState("");
+  const [selectedTypes, setSelectedTypes] = useState([]);
+  const [selectedStatuses, setSelectedStatuses] = useState([]);
+  const [sortDate, setSortDate] = useState("newest");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [loadingDocs, setLoadingDocs] = useState(false);
 
   // Recent Activities
   const [activities, setActivities] = useState([]);
@@ -114,13 +135,15 @@ export default function StaffDashboard() {
     setLoading(true);
     try {
       const [docData, statsData, actData] = await Promise.all([
-        getAllDocuments(1),
+        getAllDocuments({ page: 1 }),
         getDashboardStats(),
         getRecentActivities(1),
       ]);
 
-      setDocuments(docData.data || []);
-      setDocPagination(docData.pagination || { page: 1, totalPages: 1 });
+      console.log("📄 Docs loaded:", docData);
+
+      setDocuments(docData.data);
+      setDocPagination(docData.pagination);
       setStats(statsData || {});
 
       setActivities(actData.data || []);
@@ -134,14 +157,47 @@ export default function StaffDashboard() {
   };
 
   // ✅ Load paginated documents
-  const loadDocuments = async (page) => {
+  useEffect(() => {
+    fetchDocuments(1);
+  }, [search, selectedTypes, selectedStatuses, sortDate, startDate, endDate]);
+
+  const fetchDocuments = async (page = 1) => {
+    setLoadingDocs(true);
     try {
-      const res = await getAllDocuments(page);
-      setDocuments(res.data || []);
-      setDocPagination(res.pagination || { page: 1, totalPages: 1 });
+      const res = await getAllDocuments({
+        page,
+        search,
+        types: selectedTypes,
+        statuses: selectedStatuses,
+        sortDate,
+        startDate,
+        endDate,
+      });
+
+      console.log("📑 Fetched documents:", res);
+
+      setDocuments(res.data);
+      setDocPagination(res.pagination);
     } catch (err) {
-      console.error("Failed to load documents:", err);
+      console.error("❌ Error fetching documents:", err);
+      setDocPagination({ page: 1, totalPages: 1 }); // fallback to safe default
+    } finally {
+      setLoadingDocs(false);
     }
+  };
+
+  // Checkbox helpers
+  const toggleType = (type) => {
+    setSelectedTypes((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
+  };
+  const toggleStatus = (status) => {
+    setSelectedStatuses((prev) =>
+      prev.includes(status)
+        ? prev.filter((s) => s !== status)
+        : [...prev, status]
+    );
   };
 
   // ✅ Load paginated recent activities
@@ -343,6 +399,106 @@ export default function StaffDashboard() {
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
             All Documents
           </h2>
+
+          {/* 🔍 Search + Filters */}
+          <div className="bg-white shadow-md rounded-2xl p-5 mb-6 border border-gray-100">
+            <div className="flex flex-wrap items-center gap-4">
+              {/* 🔍 Search bar */}
+              <div className="flex items-center border border-gray-300 rounded-xl px-3 py-2 w-full sm:w-1/3 md:w-1/4 transition-all duration-200 focus-within:ring-2 focus-within:ring-blue-800 hover:shadow-sm">
+                <Search size={18} className="text-gray-400 mr-2" />
+                <input
+                  type="text"
+                  placeholder="Search by doc or client name"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full outline-none text-base text-gray-700 placeholder-gray-400 bg-transparent"
+                />
+              </div>
+
+              {/* 📄 Type filter */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-base font-medium text-gray-900">Type:</span>
+                {TYPE_OPTIONS.map((t) => {
+                  const isActive = selectedTypes.includes(t);
+                  return (
+                    <div
+                      key={t}
+                      onClick={() => toggleType(t)}
+                      className={`px-3 py-1 rounded-full text-base font-medium cursor-pointer transition-all border
+              ${
+                isActive
+                  ? " border-blue-800 text-white bg-blue-800"
+                  : " border-none shadow-sm text-gray-800  hover:border-blue-800 bg-gray-100"
+              }`}
+                    >
+                      {t}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 📂 Status filter */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-base font-medium text-gray-700">
+                  Status:
+                </span>
+                {STATUS_OPTIONS.map((s) => {
+                  const isActive = selectedStatuses.includes(s);
+                  return (
+                    <div
+                      key={s}
+                      onClick={() => toggleStatus(s)}
+                      className={`px-3 py-1 rounded-full text-base font-medium cursor-pointer transition-all border
+              ${
+                isActive
+                  ? " border-blue-800 text-white bg-blue-800"
+                  : "border-none shadow-sm text-gray-800 hover:border-2 hover:border-blue-800 bg-gray-100"
+              }`}
+                    >
+                      {s}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 🔽 Sort dropdown */}
+              <div className="flex items-center gap-2">
+                <label className="text-base font-medium text-gray-700">
+                  Sort:
+                </label>
+                <select
+                  value={sortDate}
+                  onChange={(e) => setSortDate(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-base cursor-pointer bg-white hover:border-blue-800 focus:ring-2 focus:ring-blue-900 transition-all"
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                </select>
+              </div>
+
+              {/* 📅 Date range */}
+              <div className="flex items-center gap-2 shadow-sm border border-gray-200 px-3 py-2 rounded-xl hover:border-blue-800 transition-all">
+                <label className="text-base font-medium text-gray-700">
+                  From:
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="border border-gray-400 shadow-sm rounded-lg px-2 py-1 text-base cursor-pointer focus:ring-4 focus:ring-blue-800 focus:border-blue-800 transition-all"
+                />
+                <label className="text-base font-medium text-gray-800">To:</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="border border-gray-400 rounded-lg shadow-sm px-2 py-1 text-base cursor-pointer focus:ring-4 focus:ring-blue-800 focus:border-blue-800 transition-all"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Table */}
           <Card>
             <div className="overflow-x-auto">
               <table className="min-w-full text-base">
@@ -359,7 +515,13 @@ export default function StaffDashboard() {
                 <tbody>
                   {documents.length > 0 ? (
                     documents.map((doc) => (
-                      <DocumentRow key={doc._id} doc={doc} />
+                      <DocumentRow
+                        key={doc._id}
+                        doc={doc}
+                        onStatusUpdated={() =>
+                          fetchDocuments(docPagination.page)
+                        }
+                      />
                     ))
                   ) : (
                     <tr>
@@ -367,7 +529,7 @@ export default function StaffDashboard() {
                         colSpan="6"
                         className="text-center py-6 text-gray-500"
                       >
-                        No documents found.
+                        {loadingDocs ? "Loading..." : "No documents found."}
                       </td>
                     </tr>
                   )}
@@ -378,7 +540,7 @@ export default function StaffDashboard() {
             {docPagination.totalPages > 1 && (
               <Pagination
                 pagination={docPagination}
-                onPageChange={loadDocuments}
+                onPageChange={fetchDocuments}
               />
             )}
           </Card>
@@ -458,7 +620,7 @@ export default function StaffDashboard() {
           )}
 
           {activityPagination.totalPages > 1 && (
-            <div >
+            <div>
               <Pagination
                 pagination={activityPagination}
                 onPageChange={loadActivities}

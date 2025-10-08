@@ -1,6 +1,5 @@
-// src/pages/Documents.jsx
+// src/pages/ClientDocument.jsx
 import React, { useEffect, useState, useRef } from "react";
-
 import { Card } from "../components/Card";
 import DocumentRow from "../components/DocumentRow";
 import {
@@ -8,80 +7,138 @@ import {
   getDocumentsSentToMe,
   uploadDocument,
 } from "../api/documents";
-import { Plus, Upload, XCircle, AlertCircle } from "lucide-react";
+import { Plus, Upload, XCircle, AlertCircle, Search } from "lucide-react";
+import Pagination from "../components/Pagination";
 import { useAuth } from "../contexts/AuthContext";
+
+const TYPE_OPTIONS = [
+  "PDF",
+  "Excel",
+  "Word",
+  "Image",
+  "Report",
+  "Policy",
+  "Invoice",
+  "Tax Form",
+];
+const STATUS_OPTIONS = [
+  "Approved",
+  "Pending Review",
+  "Needs Signature",
+  "Draft",
+  "Completed",
+  "Archived",
+];
 
 export default function ClientDocument() {
   const { user } = useAuth();
-  const [documents, setDocuments] = useState([]);
-  const [sentToMe, setSentToMe] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filterType, setFilterType] = useState("All");
-  const [filterStatus, setFilterStatus] = useState("All");
-  const [sortBy, setSortBy] = useState("uploadedDate-desc");
 
+  // ------------------ MY DOCUMENT STATES ------------------
+  const [myDocs, setMyDocs] = useState([]);
+  const [mySearch, setMySearch] = useState("");
+  const [mySelectedTypes, setMySelectedTypes] = useState([]);
+  const [mySelectedStatuses, setMySelectedStatuses] = useState([]);
+  const [mySortDate, setMySortDate] = useState("newest");
+  const [myStartDate, setMyStartDate] = useState("");
+  const [myEndDate, setMyEndDate] = useState("");
+  const [myPage, setMyPage] = useState(1);
+  const [myPagination, setMyPagination] = useState({ totalPages: 1 });
+  const [loadingMyDocs, setLoadingMyDocs] = useState(false);
+
+  // ------------------ SENT TO ME STATES ------------------
+  const [sentDocs, setSentDocs] = useState([]);
+  const [sentSearch, setSentSearch] = useState("");
+  const [sentSelectedTypes, setSentSelectedTypes] = useState([]);
+  const [sentSelectedStatuses, setSentSelectedStatuses] = useState([]);
+  const [sentSortDate, setSentSortDate] = useState("newest");
+  const [sentStartDate, setSentStartDate] = useState("");
+  const [sentEndDate, setSentEndDate] = useState("");
+  const [sentPage, setSentPage] = useState(1);
+  const [sentPagination, setSentPagination] = useState({ totalPages: 1 });
+  const [loadingSentDocs, setLoadingSentDocs] = useState(false);
+
+  // ------------------ UPLOAD STATES ------------------
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [pendingFile, setPendingFile] = useState(null);
-  const [alert, setAlert] = useState(""); // ✅ Alert message
+  const [alert, setAlert] = useState("");
 
-  // Load documents
-  useEffect(() => {
-    (async () => {
-      await loadDocs();
-      await loadSentToMe();
-    })();
-  }, []);
-
-  const loadDocs = async () => {
-    setLoading(true);
+  // ------------------ FETCH FUNCTIONS ------------------
+  const loadMyDocs = async () => {
+    setLoadingMyDocs(true);
     try {
-      const data = await getMyDocuments();
-      setDocuments(data || []);
+      const params = {
+        search: mySearch,
+        type: mySelectedTypes.join(","),
+        status: mySelectedStatuses.join(","),
+        sortDate: mySortDate,
+        startDate: myStartDate,
+        endDate: myEndDate,
+        page: myPage,
+        limit: 10,
+      };
+      const res = await getMyDocuments(params);
+      setMyDocs(res.data || []);
+      setMyPagination(res.pagination);
     } catch (err) {
-      console.error("Error loading documents", err);
+      console.error("Error loading my documents", err);
     } finally {
-      setLoading(false);
+      setLoadingMyDocs(false);
     }
   };
 
-  const loadSentToMe = async () => {
+  const loadSentDocs = async () => {
+    setLoadingSentDocs(true);
     try {
-      const data = await getDocumentsSentToMe();
-      setSentToMe(data || []);
+      const params = {
+        search: sentSearch,
+        type: sentSelectedTypes.join(","),
+        status: sentSelectedStatuses.join(","),
+        sortDate: sentSortDate,
+        startDate: sentStartDate,
+        endDate: sentEndDate,
+        page: sentPage,
+        limit: 10,
+      };
+      const res = await getDocumentsSentToMe(params);
+      setSentDocs(res.data || []);
+      setSentPagination(res.pagination);
     } catch (err) {
-      console.error("Error loading sent-to-me docs", err);
+      console.error("Error loading sent documents", err);
+    } finally {
+      setLoadingSentDocs(false);
     }
   };
 
-  const openFilePicker = () => fileInputRef.current?.click();
+  useEffect(() => {
+    loadMyDocs();
+  }, [mySearch, mySelectedTypes, mySelectedStatuses, mySortDate, myStartDate, myEndDate, myPage]);
 
-  // ✅ File size validation (5MB)
+  useEffect(() => {
+    loadSentDocs();
+  }, [sentSearch, sentSelectedTypes, sentSelectedStatuses, sentSortDate, sentStartDate, sentEndDate, sentPage]);
+
+  // ------------------ UPLOAD HANDLERS ------------------
+  const openFilePicker = () => fileInputRef.current?.click();
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (file.size > 5 * 1024 * 1024) {
       showAlert("File Size Limit Exceeded (Max 5 MB)");
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      fileInputRef.current.value = "";
       return;
     }
-
     setPendingFile(file);
   };
-
-  // ✅ Animated alert function
   const showAlert = (message) => {
     setAlert(message);
     setTimeout(() => setAlert(""), 3000);
   };
-
   const confirmUpload = async () => {
     if (!pendingFile) return;
     setUploading(true);
     setProgress(0);
-
     try {
       const ext = pendingFile.name.split(".").pop().toLowerCase();
       let type = "PDF";
@@ -93,12 +150,10 @@ export default function ClientDocument() {
         file: pendingFile,
         type,
         onUploadProgress: (ev) => {
-          if (ev.total)
-            setProgress(Math.round((ev.loaded / ev.total) * 100));
+          if (ev.total) setProgress(Math.round((ev.loaded / ev.total) * 100));
         },
       });
-
-      await loadDocs();
+      await loadMyDocs();
       showAlert("File Uploaded Successfully");
     } catch (err) {
       console.error("Upload failed", err);
@@ -107,48 +162,131 @@ export default function ClientDocument() {
       setUploading(false);
       setProgress(0);
       setPendingFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      fileInputRef.current.value = "";
     }
   };
-
   const discardUpload = () => {
     setPendingFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    fileInputRef.current.value = "";
   };
 
-  // ✅ Common filtering and sorting logic
-  const applyFilters = (docs) => {
-    return docs
-      .filter((d) => (filterType === "All" ? true : d.type === filterType))
-      .filter((d) =>
-        filterStatus === "All" ? true : d.status === filterStatus
-      )
-      .sort((a, b) => {
-        const [key, dir] = sortBy.split("-");
-        const av = a[key] ? new Date(a[key]).getTime() : 0;
-        const bv = b[key] ? new Date(b[key]).getTime() : 0;
-        return dir === "desc" ? bv - av : av - bv;
-      });
+  // ------------------ FILTER TAG HANDLERS ------------------
+  const toggleFilter = (value, setFunc, list) => {
+    setFunc((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+    );
   };
 
-  const filteredMyDocs = applyFilters(documents);
-  const filteredSentToMe = applyFilters(sentToMe);
+  // ------------------ REUSABLE FILTER COMPONENT ------------------
+  const FilterSection = ({
+    search,
+    setSearch,
+    selectedTypes,
+    toggleType,
+    selectedStatuses,
+    toggleStatus,
+    sortDate,
+    setSortDate,
+    startDate,
+    setStartDate,
+    endDate,
+    setEndDate,
+  }) => (
+    <div className="bg-white shadow-md rounded-2xl p-5 mb-6 border border-gray-100">
+      <div className="flex flex-wrap items-center gap-4">
+        {/* Search */}
+        <div className="flex items-center border border-gray-300 rounded-xl px-3 py-2 w-full sm:w-1/3 transition-all duration-200 focus-within:ring-2 focus-within:ring-blue-800 hover:shadow-sm">
+          <Search size={18} className="text-gray-400 mr-2" />
+          <input
+            type="text"
+            placeholder="Search by name or client email"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full outline-none text-sm text-gray-700 placeholder-gray-400 bg-transparent"
+          />
+        </div>
 
+        {/* Type Filter */}
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-base font-medium text-gray-900">Type:</span>
+          {TYPE_OPTIONS.map((t) => (
+            <button
+              key={t}
+              onClick={() => toggleType(t)}
+              className={`px-3 py-1 rounded-full text-base font-medium cursor-pointer transition-all border ${
+                selectedTypes.includes(t)
+                  ? " border-blue-800 text-white bg-blue-800"
+                  : "border-none shadow-sm text-gray-800 hover:border-2 hover:border-blue-800 bg-gray-100"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+
+        {/* Status Filter */}
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-base font-medium text-gray-700">Status:</span>
+          {STATUS_OPTIONS.map((s) => (
+            <button
+              key={s}
+              onClick={() => toggleStatus(s)}
+              className={`px-3 py-1 rounded-full text-base font-medium cursor-pointer transition-all border ${
+                selectedStatuses.includes(s)
+                  ? " border-blue-800 text-white bg-blue-800"
+                  : "border-none shadow-sm text-gray-800 hover:border-2 hover:border-blue-800 bg-gray-100"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+
+        {/* Sort */}
+        <div className="flex items-center gap-2">
+          <label className="text-base font-medium text-gray-900">Sort:</label>
+          <select
+            value={sortDate}
+            onChange={(e) => setSortDate(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm cursor-pointer bg-white hover:border-blue-800 focus:ring-2 focus:ring-blue-900 transition-all"
+          >
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+          </select>
+        </div>
+
+        {/* Date Range */}
+        <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-2 rounded-xl hover:border-blue-800 transition-all">
+          <label className="text-sm font-medium text-gray-700">From:</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2 py-1 text-sm cursor-pointer focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition-all"
+          />
+          <label className="text-sm font-medium text-gray-700">To:</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2 py-1 text-sm cursor-pointer focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition-all"
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  // ------------------ MAIN RENDER ------------------
   return (
     <div className="flex font-inter text-gray-800">
-
-      {/* Main Content */}
       <div className="flex-1 flex flex-col">
-
         <main className="p-6 min-h-screen">
-          {/* Header */}
+          {/* HEADER */}
           <div className="flex items-start justify-between mb-8">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                Documents Dashboard
-              </h1>
+              <h1 className="text-2xl font-bold text-gray-900">Documents Dashboard</h1>
               <p className="text-gray-600 text-base mt-1">
-                Manage and upload all your important client documents
+                Manage, search, and organize all your important documents
               </p>
             </div>
 
@@ -159,94 +297,37 @@ export default function ClientDocument() {
               </div>
             )}
 
-            <div className="flex items-center gap-3">
-              <button
-                onClick={openFilePicker}
-                className="inline-flex items-center gap-2 bg-blue-800 cursor-pointer text-white px-5 py-3 rounded-lg shadow-md text-base font-semibold hover:bg-blue-900 transition-all"
-              >
-                <Plus size={18} /> Upload Document
-              </button>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-            </div>
+            <button
+              onClick={openFilePicker}
+              className="inline-flex items-center gap-2 bg-blue-800 text-white px-5 py-3 rounded-lg shadow-md text-base font-semibold hover:bg-blue-900 transition-all cursor-pointer"
+            >
+              <Plus size={18} /> Upload Document
+            </button>
+            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
           </div>
 
-          {/* Filters */}
-          <section className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm mb-8">
-            <h2 className="text-base font-semibold text-gray-800 mb-3">
-              Filter Documents
-            </h2>
-            <div className="flex flex-col lg:flex-row gap-5 lg:items-center">
-              {/* Type */}
-              <div className="flex items-center gap-3">
-                <label className="text-base font-medium text-gray-700">
-                  Type:
-                </label>
-                <select
-                  className="border-2 rounded-sm px-2 py-1 text-base cursor-pointer focus:ring-blue-800 focus:border-blue-800"
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                >
-                  <option>All</option>
-                  <option>PDF</option>
-                  <option>Excel</option>
-                  <option>Word</option>
-                  <option>Image</option>
-                  <option>Invoice</option>
-                  <option>Policy</option>
-                </select>
-              </div>
-
-              {/* Status */}
-              <div className="flex items-center gap-3">
-                <label className="text-base font-medium text-gray-700">
-                  Status:
-                </label>
-                <select
-                  className="border-2 rounded-sm px-2 py-1 text-base cursor-pointer focus:ring-blue-800 focus:border-blue-800"
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                >
-                  <option>All</option>
-                  <option>Approved</option>
-                  <option>Pending Review</option>
-                  <option>Needs Signature</option>
-                  <option>Draft</option>
-                </select>
-              </div>
-
-              {/* Sort */}
-              <div className="ml-auto flex items-center gap-3">
-                <label className="text-base font-medium text-gray-700">
-                  Sort By:
-                </label>
-                <select
-                  className="border-2 rounded-sm px-2 py-1 text-base cursor-pointer focus:ring-blue-800 focus:border-blue-800"
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                >
-                  <option value="uploadedDate-desc">Newest First</option>
-                  <option value="uploadedDate-asc">Oldest First</option>
-                </select>
-              </div>
-            </div>
-          </section>
-
-          {/* My Documents */}
+          {/* MY DOCUMENTS */}
           <section>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              My Uploaded Documents
-            </h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">My Uploaded Documents</h2>
+            <FilterSection
+              search={mySearch}
+              setSearch={setMySearch}
+              selectedTypes={mySelectedTypes}
+              toggleType={(t) => toggleFilter(t, setMySelectedTypes, mySelectedTypes)}
+              selectedStatuses={mySelectedStatuses}
+              toggleStatus={(s) => toggleFilter(s, setMySelectedStatuses, mySelectedStatuses)}
+              sortDate={mySortDate}
+              setSortDate={setMySortDate}
+              startDate={myStartDate}
+              setStartDate={setMyStartDate}
+              endDate={myEndDate}
+              setEndDate={setMyEndDate}
+            />
             <Card>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-base">
                   <thead>
-                    <tr className="text-left text-gray-600 uppercase text-base tracking-wider border-b">
+                    <tr className="text-left text-gray-600 uppercase text-sm tracking-wider border-b">
                       <th className="px-6 py-3">Document Name</th>
                       <th className="px-6 py-3">Type</th>
                       <th className="px-6 py-3">Uploaded Date</th>
@@ -256,39 +337,50 @@ export default function ClientDocument() {
                     </tr>
                   </thead>
                   <tbody>
-                    {loading ? (
+                    {loadingMyDocs ? (
                       <tr>
                         <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                           Loading documents…
                         </td>
                       </tr>
-                    ) : filteredMyDocs.length === 0 ? (
+                    ) : myDocs.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                           No documents found.
                         </td>
                       </tr>
                     ) : (
-                      filteredMyDocs.map((doc) => (
-                        <DocumentRow key={doc._id} doc={doc} />
-                      ))
+                      myDocs.map((doc) => <DocumentRow key={doc._id} doc={doc} />)
                     )}
                   </tbody>
                 </table>
               </div>
             </Card>
+            <Pagination pagination={myPagination} onPageChange={(newPage) => setMyPage(newPage)} />
           </section>
 
-          {/* ✅ Sent To Me Section (Always visible) */}
+          {/* SENT TO ME */}
           <section className="mt-10">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Sent To Me
-            </h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Sent To Me</h2>
+            <FilterSection
+              search={sentSearch}
+              setSearch={setSentSearch}
+              selectedTypes={sentSelectedTypes}
+              toggleType={(t) => toggleFilter(t, setSentSelectedTypes, sentSelectedTypes)}
+              selectedStatuses={sentSelectedStatuses}
+              toggleStatus={(s) => toggleFilter(s, setSentSelectedStatuses, sentSelectedStatuses)}
+              sortDate={sentSortDate}
+              setSortDate={setSentSortDate}
+              startDate={sentStartDate}
+              setStartDate={setSentStartDate}
+              endDate={sentEndDate}
+              setEndDate={setSentEndDate}
+            />
             <Card>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-base">
                   <thead>
-                    <tr className="text-left text-gray-800 uppercase text-base tracking-wider border-b">
+                    <tr className="text-left text-gray-600 uppercase text-sm tracking-wider border-b">
                       <th className="px-6 py-3">Document Name</th>
                       <th className="px-6 py-3">Type</th>
                       <th className="px-6 py-3">Uploaded Date</th>
@@ -298,55 +390,51 @@ export default function ClientDocument() {
                     </tr>
                   </thead>
                   <tbody>
-                    {loading ? (
+                    {loadingSentDocs ? (
                       <tr>
                         <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                           Loading documents…
                         </td>
                       </tr>
-                    ) : filteredSentToMe.length === 0 ? (
+                    ) : sentDocs.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                           No documents found.
                         </td>
                       </tr>
                     ) : (
-                      filteredSentToMe.map((d) => (
-                        <DocumentRow key={d._id} doc={d} />
-                      ))
+                      sentDocs.map((doc) => <DocumentRow key={doc._id} doc={doc} />)
                     )}
                   </tbody>
                 </table>
               </div>
             </Card>
+            <Pagination pagination={sentPagination} onPageChange={(newPage) => setSentPage(newPage)} />
           </section>
         </main>
       </div>
 
-      {/* Upload Confirmation Modal */}
+      {/* UPLOAD MODAL */}
       {pendingFile && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
           <div className="bg-white rounded-xl shadow-2xl p-6 w-96 border border-gray-200">
             <div className="flex items-center gap-3 mb-4">
               <Upload className="text-blue-700" size={24} />
-              <h3 className="text-xl font-semibold text-gray-900">
-                Confirm Upload
-              </h3>
+              <h3 className="text-xl font-semibold text-gray-900">Confirm Upload</h3>
             </div>
             <p className="text-lg text-gray-600 mb-6">
-              Do you want to upload{" "}
-              <span className="font-medium">{pendingFile.name}</span>?
+              Do you want to upload <span className="font-medium">{pendingFile.name}</span>?
             </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={discardUpload}
-                className="inline-flex text-lg cursor-pointer items-center gap-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition"
+                className="inline-flex text-lg items-center gap-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition cursor-pointer"
               >
                 <XCircle size={16} /> Discard
               </button>
               <button
                 onClick={confirmUpload}
-                className="inline-flex text-lg cursor-pointer items-center gap-1 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-medium transition"
+                className="inline-flex text-lg items-center gap-1 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-medium transition cursor-pointer"
               >
                 <Upload size={16} /> Upload
               </button>
@@ -355,12 +443,10 @@ export default function ClientDocument() {
         </div>
       )}
 
-      {/* Upload Progress Bubble */}
+      {/* UPLOAD PROGRESS */}
       {uploading && (
         <div className="fixed bottom-6 right-6 bg-white border border-gray-200 rounded-lg p-4 shadow-lg w-72 animate-fadeIn">
-          <div className="text-base font-medium text-gray-700 mb-2">
-            Uploading {progress}%
-          </div>
+          <div className="text-base font-medium text-gray-700 mb-2">Uploading {progress}%</div>
           <div className="bg-gray-100 rounded-full h-2">
             <div
               className="h-2 rounded-full bg-gradient-to-r from-blue-700 to-blue-400"

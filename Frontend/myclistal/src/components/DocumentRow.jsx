@@ -9,9 +9,10 @@ import {
   updateDocumentStatus,
 } from "../api/documents";
 
-export default function DocumentRow({ doc }) {
+export default function DocumentRow({ doc, onStatusUpdated }) {
   const { user } = useAuth();
   const token = user?.token;
+  const role = user?.role; // 🟢 Added
 
   const [showModal, setShowModal] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState(doc.status);
@@ -57,17 +58,28 @@ export default function DocumentRow({ doc }) {
   const handleStatusChange = async () => {
     if (!token) return showPopup("error", "Not authenticated.");
     setLoading(true);
+
     try {
       await updateDocumentStatus(doc._id, selectedStatus);
+      doc.status = selectedStatus;
       showPopup("success", "Document status updated successfully!");
       setShowModal(false);
-      setTimeout(() => window.location.reload(), 1200); // Optional small refresh
+      if (onStatusUpdated) onStatusUpdated();
     } catch (err) {
       console.error("Status update failed:", err);
       showPopup("error", "Failed to update document status.");
     } finally {
       setLoading(false);
     }
+  };
+
+  // 🔴 Restrict edit button by role
+  const handleEditClick = () => {
+    if (role !== "Staff") {
+      showPopup("error", "Access denied. Staff only");
+      return;
+    }
+    setShowModal(true);
   };
 
   const truncatedName =
@@ -85,7 +97,7 @@ export default function DocumentRow({ doc }) {
   return (
     <>
       {/* 🔸 Table Row */}
-      <tr className="border-b last:border-b-0 hover:bg-gray-50 transition-colors">
+      <tr className="border-b last:border-b-0 cursor-pointer hover:bg-gray-50 transition-colors">
         <td className="px-4 py-4 whitespace-nowrap">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-gray-50 border">
@@ -101,7 +113,7 @@ export default function DocumentRow({ doc }) {
                 {truncatedName}
               </div>
               <div className="text-base text-gray-800">
-                {doc.uploadedBy?.email}
+                {doc.uploadedByData?.email}
               </div>
             </div>
           </div>
@@ -131,9 +143,13 @@ export default function DocumentRow({ doc }) {
               <Download size={18} />
             </button>
             <button
-              onClick={() => setShowModal(true)}
+              onClick={handleEditClick} // ✅ Role check here
               title="Edit Status"
-              className="p-2 hover:bg-gray-200 cursor-pointer rounded-md transition"
+              className={`p-2 rounded-md transition ${
+                role === "Staff"
+                  ? "hover:bg-gray-200 cursor-pointer"
+                  : "hidden"
+              }`}
             >
               <Edit3 size={18} />
             </button>

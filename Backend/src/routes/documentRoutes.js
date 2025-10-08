@@ -23,14 +23,15 @@ const router = express.Router();
 //  Upload new document (Clients & Staff)
 router.post("/upload", protect, upload.single("file"), uploadDocument);
 
-// Get documents uploaded by logged-in client
-router.get("/my-documents", protect, isClient, getClientDocuments);
 
 // Download own document (CLient and Staff can access )
 router.get("/:documentId/download", protect, downloadDocument);
 
 // Preview document inline(Client and staff can access )
 router.get("/:documentId/preview", protect, previewDocument);
+
+// Get documents uploaded by logged-in client
+router.get("/my-documents", protect, isClient, getClientDocuments);
 
 //    STAFF ROUTES
 
