@@ -21,6 +21,7 @@ import DocumentRow from "../components/DocumentRow";
 import RecentActivityRow from "../components/RecentActivityRow";
 import { groupActivities } from "../utils/activityGrouping";
 import Pagination from "../components/Pagination";
+import { useCallback, useMemo } from "react";
 
 const TYPE_OPTIONS = [
   "PDF",
@@ -200,67 +201,29 @@ export default function StaffDashboard() {
     );
   };
 
-  // ✅ Load paginated recent activities
-  const loadActivities = async (page) => {
+  // ✅ Load activities with filters + pagination (backend handles filtering)
+  const loadActivities = async (page = 1) => {
     try {
-      const res = await getRecentActivities(page);
+      const res = await getRecentActivities({
+        page,
+        type: actionFilter,
+        time: timeFilter,
+        startDate: customStart,
+        endDate: customEnd,
+      });
+
       setActivities(res.data || []);
-      setFilteredActivities(res.data || []);
+      setFilteredActivities(res.data || []); // identical for clarity
       setActivityPagination(res.pagination || { page: 1, totalPages: 1 });
     } catch (err) {
-      console.error("Failed to load activities:", err);
+      console.error("Failed to fetch activities:", err);
     }
   };
 
-  // ✅ Filters for Recent Activities
-  const applyFilters = () => {
-    let filtered = [...activities];
-    const now = new Date();
-
-    if (actionFilter !== "All") {
-      filtered = filtered.filter((a) => a.action === actionFilter);
-    }
-
-    if (timeFilter === "Today") {
-      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      filtered = filtered.filter((a) => new Date(a.createdAt) >= start);
-    } else if (timeFilter === "Yesterday") {
-      const start = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate() - 1
-      );
-      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      filtered = filtered.filter((a) => {
-        const d = new Date(a.createdAt);
-        return d >= start && d < end;
-      });
-    } else if (timeFilter === "This Week") {
-      const start = new Date(now);
-      start.setDate(now.getDate() - now.getDay());
-      start.setHours(0, 0, 0, 0);
-      filtered = filtered.filter((a) => new Date(a.createdAt) >= start);
-    } else if (timeFilter === "This Month") {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1);
-      filtered = filtered.filter((a) => new Date(a.createdAt) >= start);
-    } else if (timeFilter === "This Year") {
-      const start = new Date(now.getFullYear(), 0, 1);
-      filtered = filtered.filter((a) => new Date(a.createdAt) >= start);
-    } else if (timeFilter === "Custom" && customStart && customEnd) {
-      const start = new Date(customStart);
-      const end = new Date(customEnd);
-      filtered = filtered.filter((a) => {
-        const d = new Date(a.createdAt);
-        return d >= start && d <= end;
-      });
-    }
-
-    setFilteredActivities(filtered);
-  };
-
+  // ✅ Reactively fetch activities whenever filters or pagination change
   useEffect(() => {
-    applyFilters();
-  }, [activities, actionFilter, timeFilter, customStart, customEnd]);
+    loadActivities(1);
+  }, [actionFilter, timeFilter, customStart, customEnd]);
 
   // ✅ Send Card Handlers
   const openSendCard = async () => {
@@ -417,7 +380,9 @@ export default function StaffDashboard() {
 
               {/* 📄 Type filter */}
               <div className="flex flex-wrap gap-2 items-center">
-                <span className="text-base font-medium text-gray-900">Type:</span>
+                <span className="text-base font-medium text-gray-900">
+                  Type:
+                </span>
                 {TYPE_OPTIONS.map((t) => {
                   const isActive = selectedTypes.includes(t);
                   return (
@@ -487,7 +452,9 @@ export default function StaffDashboard() {
                   onChange={(e) => setStartDate(e.target.value)}
                   className="border border-gray-400 shadow-sm rounded-lg px-2 py-1 text-base cursor-pointer focus:ring-4 focus:ring-blue-800 focus:border-blue-800 transition-all"
                 />
-                <label className="text-base font-medium text-gray-800">To:</label>
+                <label className="text-base font-medium text-gray-800">
+                  To:
+                </label>
                 <input
                   type="date"
                   value={endDate}
@@ -599,8 +566,8 @@ export default function StaffDashboard() {
             (groupName) =>
               grouped[groupName] &&
               grouped[groupName].length > 0 && (
-                <div key={groupName}>
-                  <h3 className="text-gray-500 text-sm font-semibold">
+                <div key={groupName} className="mb-4">
+                  <h3 className="text-gray-500 text-sm font-semibold mb-2">
                     {groupName}
                   </h3>
                   <ul>
@@ -620,7 +587,7 @@ export default function StaffDashboard() {
           )}
 
           {activityPagination.totalPages > 1 && (
-            <div>
+            <div className="mt-4">
               <Pagination
                 pagination={activityPagination}
                 onPageChange={loadActivities}

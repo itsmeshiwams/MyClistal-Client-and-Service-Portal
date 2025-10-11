@@ -122,11 +122,12 @@ export const downloadDocument = async (req, res) => {
       return res.status(404).json({ message: "File missing from server" });
     }
 
-    // Role check
-    if (
-      req.user.role !== "Staff" &&
-      doc.uploadedBy.toString() !== req.user._id.toString()
-    ) {
+    // ✅ Updated role check — allow client who was sent the document
+    const isStaff = req.user.role === "Staff";
+    const isUploader = doc.uploadedBy.toString() === req.user._id.toString();
+    const isRecipient = doc.client?.toString() === req.user._id.toString();
+
+    if (!isStaff && !isUploader && !isRecipient) {
       return res.status(403).json({ message: "Access denied" });
     }
 
@@ -148,11 +149,12 @@ export const previewDocument = async (req, res) => {
       return res.status(404).json({ message: "File missing from server" });
     }
 
-    // Role check
-    if (
-      req.user.role !== "Staff" &&
-      doc.uploadedBy.toString() !== req.user._id.toString()
-    ) {
+    // ✅ Updated role check — allow client who was sent the document
+    const isStaff = req.user.role === "Staff";
+    const isUploader = doc.uploadedBy.toString() === req.user._id.toString();
+    const isRecipient = doc.client?.toString() === req.user._id.toString();
+
+    if (!isStaff && !isUploader && !isRecipient) {
       return res.status(403).json({ message: "Access denied" });
     }
 
@@ -224,38 +226,106 @@ export const getDashboardStats = async (req, res) => {
 };
 
 // ✅ Recent activities
+
 export const getRecentActivities = async (req, res) => {
   try {
-    const limit = 15; // fixed page size
-    const totalCount = await Activity.countDocuments();
-    const totalPages = Math.ceil(totalCount / limit);
+    const {
+      page = 1,
+      limit = 15,
+      type = "All",
+      time = "All",
+      startDate,
+      endDate,
+    } = req.query;
 
-    const rawPage = req.query.page || "1";
-    let currentPage = parseInt(rawPage);
-    if (isNaN(currentPage)) currentPage = 1;
-    if (currentPage > totalPages) currentPage = totalPages;
+    const filters = {};
 
-    const page = resolvePageNumber(rawPage, totalPages, currentPage);
+    // 🟢 Filter by Activity Type
+    if (type && type !== "All") {
+      filters.action = type;
+    }
 
-    const skip = (page - 1) * limit;
+    // 🟢 Time-based filters
+    const now = new Date();
+    let start, end;
 
-    const activities = await Activity.find()
+    switch (time) {
+      case "Today":
+        start = new Date(now.setHours(0, 0, 0, 0));
+        end = new Date();
+        filters.createdAt = { $gte: start, $lte: end };
+        break;
+
+      case "Yesterday":
+        start = new Date();
+        start.setDate(start.getDate() - 1);
+        start.setHours(0, 0, 0, 0);
+        end = new Date(start);
+        end.setHours(23, 59, 59, 999);
+        filters.createdAt = { $gte: start, $lte: end };
+        break;
+
+      case "This Week":
+        start = new Date();
+        const firstDayOfWeek = start.getDate() - start.getDay(); // Sunday
+        start = new Date(start.setDate(firstDayOfWeek));
+        start.setHours(0, 0, 0, 0);
+        end = new Date();
+        filters.createdAt = { $gte: start, $lte: end };
+        break;
+
+      case "This Month":
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date();
+        filters.createdAt = { $gte: start, $lte: end };
+        break;
+
+      case "This Year":
+        start = new Date(now.getFullYear(), 0, 1);
+        end = new Date();
+        filters.createdAt = { $gte: start, $lte: end };
+        break;
+
+      case "Custom":
+        if (startDate && endDate) {
+          filters.createdAt = {
+            $gte: new Date(startDate),
+            $lte: new Date(endDate),
+          };
+        }
+        break;
+    }
+
+    // 🟢 Base Query
+    const query = Activity.find(filters)
       .populate("user", "email role")
       .populate("targetClient", "email role")
       .populate("document", "name type status")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+      .sort({ createdAt: -1 });
 
-    const nextPageNumber = page < totalPages ? page + 1 : null;
-    const prevPageNumber = page > 1 ? page - 1 : null;
+    // 🟢 Count after filtering
+    const totalCount = await Activity.countDocuments(filters);
+    const totalPages = Math.ceil(totalCount / limit);
+
+    // 🟢 Pagination applied AFTER filtering
+    const skip = (page - 1) * limit;
+    const activities = await query.skip(skip).limit(Number(limit));
+
+    const nextPageNumber = page < totalPages ? Number(page) + 1 : null;
+    const prevPageNumber = page > 1 ? Number(page) - 1 : null;
 
     res.json({
       data: activities,
+      filters: {
+        type,
+        time,
+        startDate,
+        endDate,
+      },
       pagination: {
         total: totalCount,
-        page,
-        limit,
+        page: Number(page),
+        limit: Number(limit),
         totalPages,
         nextPageNumber,
         prevPageNumber,
@@ -336,7 +406,6 @@ export const getDocumentsSentToMe = async (req, res) => {
     res.status(500).json({ message: "Error fetching sent documents" });
   }
 };
-
 
 // ✅ Get all users with role "Client" (Staff-only)
 export const getAllClients = async (req, res) => {

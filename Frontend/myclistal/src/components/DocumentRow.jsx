@@ -1,6 +1,6 @@
 // src/components/DocumentRow.jsx
 import React, { useState } from "react";
-import { Eye, Download, Edit3, X } from "lucide-react";
+import { Eye, Download, Edit3, X, ArrowRight } from "lucide-react";
 import StatusBadge from "./StatusBadge";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -112,9 +112,23 @@ export default function DocumentRow({ doc, onStatusUpdated }) {
               >
                 {truncatedName}
               </div>
-              <div className="text-base text-gray-800">
-                {doc.uploadedByData?.email}
-              </div>
+              {role === "Staff" && (
+                <>
+                  {doc.uploadedByData?.email === doc.clientData?.email ? (
+                    <div className="text-xs text-gray-800 font-semibold flex">
+                      <span className="font-normal mr-1">Uploaded by:</span>{" "}
+                      {doc.uploadedByData?.email}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-800 font-semibold flex">
+                      <span className="font-normal mr-1">From</span>{" "}
+                      {doc.uploadedByData?.email}{" "}
+                      <span className="font-normal mx-1">To</span>{" "}
+                      {doc.clientData?.email}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </td>
@@ -146,9 +160,7 @@ export default function DocumentRow({ doc, onStatusUpdated }) {
               onClick={handleEditClick} // ✅ Role check here
               title="Edit Status"
               className={`p-2 rounded-md transition ${
-                role === "Staff"
-                  ? "hover:bg-gray-200 cursor-pointer"
-                  : "hidden"
+                role === "Staff" ? "hover:bg-gray-200 cursor-pointer" : "hidden"
               }`}
             >
               <Edit3 size={18} />

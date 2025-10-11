@@ -3,28 +3,72 @@ import api from "./api";
 
 /**
  * Document API helpers
- * Base endpoints expected:
- *  GET  /api/documents/my-documents
- *  GET  /api/documents/sent-to-me
- *  POST /api/documents/upload
- *  GET  /api/documents/:id/preview
- *  GET  /api/documents/:id/download
+ * Expected endpoints:
+ *  GET  /document/my-documents
+ *  GET  /document/sent-to-me
+ *  POST /document/upload
+ *  GET  /document/:id/preview
+ *  GET  /document/:id/download
  */
 
 const BASE_URL = "http://localhost:5000/document";
 
-export const getMyDocuments = async (params = {}) => {
-  const query = new URLSearchParams(params).toString();
-  const res = await api.get(`${BASE_URL}/my-documents?${query}`);
-  return res.data;
+// ✅ Build consistent query params
+const buildParams = ({
+  page = 1,
+  limit = 15,
+  search = "",
+  types = [],
+  statuses = [],
+  sortDate = "newest",
+  startDate = "",
+  endDate = "",
+} = {}) => {
+  const params = new URLSearchParams();
+  params.append("page", page);
+  params.append("limit", limit);
+  if (search) params.append("search", search);
+  if (types.length) params.append("type", types.join(","));
+  if (statuses.length) params.append("status", statuses.join(","));
+  if (sortDate) params.append("sortDate", sortDate);
+  if (startDate) params.append("startDate", startDate);
+  if (endDate) params.append("endDate", endDate);
+  return params;
 };
 
-export const getDocumentsSentToMe = async (params = {}) => {
-  const query = new URLSearchParams(params).toString();
-  const res = await api.get(`${BASE_URL}/sent-to-me?${query}`);
-  return res.data;
+// ✅ Universal fetch helper (handles token + params)
+const fetchDocumentParam = async (endpoint, params = {}) => {
+  try {
+    const token = localStorage.getItem("token"); // JWT token
+    if (!token) {
+      console.warn("⚠️ No access token found in localStorage.");
+      return { data: [], pagination: { page: 1, totalPages: 1 } };
+    }
+
+    const query = buildParams(params).toString();
+    const res = await api.get(`${BASE_URL}/${endpoint}?${query}`, {
+      headers: {
+        Authorization: `Bearer ${token}`, // ✅ Add Authorization header
+      },
+    });
+
+    return {
+      data: res.data?.data || [],
+      pagination: res.data?.pagination || { page: 1, totalPages: 1 },
+    };
+  } catch (err) {
+    console.error(`❌ fetchDocuments (${endpoint}) failed:`, err);
+    return { data: [], pagination: { page: 1, totalPages: 1 } };
+  }
 };
 
+// ✅ CLIENT: My Documents
+export const getMyDocuments = (params = {}) =>
+  fetchDocumentParam("my-documents", params);
+
+// ✅ CLIENT: Sent To Me
+export const getDocumentsSentToMe = (params = {}) =>
+  fetchDocumentParam("sent-to-me", params);
 
 export const uploadDocument = async ({
   file,
@@ -32,15 +76,22 @@ export const uploadDocument = async ({
   type,
   onUploadProgress,
 }) => {
+  const token = localStorage.getItem("token");
+  if (!token) throw new Error("No token found");
+
   const fd = new FormData();
   fd.append("file", file);
   if (name) fd.append("name", name);
   if (type) fd.append("type", type);
 
   const res = await api.post(`${BASE_URL}/upload`, fd, {
-    headers: { "Content-Type": "multipart/form-data" },
+    headers: {
+      "Content-Type": "multipart/form-data",
+      Authorization: `Bearer ${token}`, // ✅ add this line
+    },
     onUploadProgress,
   });
+
   return res.data;
 };
 
@@ -76,38 +127,9 @@ export const downloadDocument = async (id, name, token) => {
 
 // ------------------ STAFF ROUTES ------------------
 
-// Staff: Get all documents with filters/search/pagination
-export const getAllDocuments = async ({
-  page = 1,
-  limit = 15,
-  search = "",
-  types = [],
-  statuses = [],
-  sortDate = "newest",
-  startDate = "",
-  endDate = "",
-} = {}) => {
-  try {
-    const params = new URLSearchParams();
-    params.append("page", page);
-    params.append("limit", limit);
-    if (search) params.append("search", search);
-    if (types.length) params.append("type", types.join(","));
-    if (statuses.length) params.append("status", statuses.join(","));
-    if (sortDate) params.append("sortDate", sortDate);
-    if (startDate) params.append("startDate", startDate);
-    if (endDate) params.append("endDate", endDate);
-
-    const res = await api.get(`${BASE_URL}/all?${params.toString()}`);
-    return {
-      data: res.data?.data || [],
-      pagination: res.data?.pagination || { page: 1, totalPages: 1 },
-    };
-  } catch (err) {
-    console.error("❌ getAllDocuments failed:", err);
-    return { data: [], pagination: { page: 1, totalPages: 1 } };
-  }
-};
+// ✅ STAFF: Get all documents
+export const getAllDocuments = (params = {}) =>
+  fetchDocumentParam("all", params);
 
 // Staff: Update document status
 export const updateDocumentStatus = async (documentId, status) => {
@@ -121,11 +143,28 @@ export const getDashboardStats = async () => {
   return res.data;
 };
 
-// Staff: Recent activity logs
-export const getRecentActivities = async (page = 1) => {
-  const res = await api.get(`${BASE_URL}/activities/recent?page=${page}`);
+// ✅ Updated getRecentActivities API (with filters)
+export const getRecentActivities = async ({
+  page = 1,
+  type = "All",
+  time = "All",
+  startDate = "",
+  endDate = "",
+}) => {
+  const params = new URLSearchParams({
+    page,
+    type,
+    time,
+  });
+  if (startDate) params.append("startDate", startDate);
+  if (endDate) params.append("endDate", endDate);
+
+  const res = await api.get(
+    `${BASE_URL}/activities/recent?${params.toString()}`
+  );
   return res.data;
 };
+
 
 // Staff: Send a document to a specific client
 export const sendDocumentToClient = async (formData) => {
