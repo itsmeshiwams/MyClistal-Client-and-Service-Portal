@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import authRoutes from "./routes/authRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import documentRoutes from "./routes/documentRoutes.js";
+import chatRoutes from "./routes/chatRoutes.js";
 
 const app = express();
 
@@ -24,6 +25,9 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // ✅ Routes
 app.use("/auth", authRoutes);
 app.use("/dashboard", dashboardRoutes);
+
 app.use("/document", documentRoutes);
+
+app.use("/chat", chatRoutes);
 
 export default app;
