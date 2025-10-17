@@ -2,24 +2,33 @@
 import { authSocket } from "../middleware/authSocket.js";
 import Chat from "../models/Chat.js";
 import Message from "../models/Message.js";
-import { getIO } from "../utils/socket.js";
 
 export const initChatSocket = (io) => {
   io.use(authSocket);
 
   io.on("connection", (socket) => {
-    const { id: userId, role } = socket.user;
-    socket.join(userId); // ✅ Personal room for direct notifications
-
-    console.log(`🔌 ${role} connected: ${userId}`);
+    const { id: userId, role, email } = socket.user;
+    socket.join(userId); // 🔒 private user room
+    console.log(`✅ ${role} connected: ${email} (${userId})`);
 
     /**
-     * ✅ BONUS: Join specific chat room for real-time updates
-     * Called from frontend: socket.emit("chat:join", chatId)
+     * 🟢 Auto join all chat rooms for staff
+     */
+    if (role === "Staff") {
+      Chat.find({ participants: userId })
+        .select("_id")
+        .then((chats) => {
+          chats.forEach((c) => socket.join(`chat:${c._id}`));
+          console.log(`🟦 Staff ${email} auto-joined ${chats.length} rooms`);
+        })
+        .catch((err) => console.error("Auto join failed:", err.message));
+    }
+
+    /**
+     * ✳️ Manual join (for Clients)
      */
     socket.on("chat:join", async (chatId) => {
       try {
-        // Optional: verify that user is a participant of the chat before joining
         const chat = await Chat.findById(chatId).select("participants");
         if (!chat) return;
 
@@ -28,49 +37,68 @@ export const initChatSocket = (io) => {
         );
         if (isParticipant) {
           socket.join(`chat:${chatId}`);
-          console.log(`📡 ${userId} joined room chat:${chatId}`);
-        } else {
-          console.warn(`⚠️ User ${userId} tried to join chat ${chatId} without access`);
+          console.log(`📡 ${email} joined room chat:${chatId}`);
         }
       } catch (err) {
-        console.error("❌ chat:join error:", err);
+        console.error("❌ chat:join error:", err.message);
       }
     });
 
     /**
-     * Existing message send event (you can keep or remove if replaced by HTTP API)
+     * 💬 message:new — Broadcast instantly
+     * Fired by backend controller via HTTP or client via socket
      */
-    socket.on("message:send", async ({ chatId, recipientId, content }) => {
+    socket.on("message:new", async ({ chatId, content }) => {
       try {
-        if (!content || !content.trim()) return;
-
-        // ✅ Permission checks (example)
-        if (role === "Client" && socket.user.id === recipientId) {
-          return; // prevent self messaging for client
-        }
-        if (role === "Client" && recipientId === userId) return;
-        // Additional checks can go here
+        if (!chatId || !content?.trim()) return;
+        const chat = await Chat.findById(chatId).populate(
+          "participants",
+          "_id email role"
+        );
+        if (!chat) return;
 
         const message = await Message.create({
           chat: chatId,
           sender: userId,
-          recipient: recipientId,
-          content: content.trim(),
+          text: content.trim(),
         });
+        await message.populate("sender", "email role");
 
-        // 📡 Emit to recipient and sender
-        io.to(recipientId).emit("message:new", message);
-        io.to(userId).emit("message:sent", message);
+        chat.lastMessage = message._id;
+        await chat.save();
 
-        // 📡 Also broadcast to chat room if joined
         io.to(`chat:${chatId}`).emit("message:new", { chatId, message });
       } catch (err) {
-        console.error("Socket send error:", err);
+        console.error("❌ message:new error:", err);
+      }
+    });
+
+    /**
+     * 👁️ chat:read — live read receipts
+     */
+    socket.on("chat:read", async ({ chatId }) => {
+      try {
+        const chat = await Chat.findById(chatId).select("participants");
+        if (!chat) return;
+
+        const isParticipant = chat.participants.some(
+          (p) => p.toString() === userId
+        );
+        if (!isParticipant) return;
+
+        await Message.updateMany(
+          { chat: chatId },
+          { $set: { [`statusMap.${userId}`]: "read" } }
+        );
+
+        io.to(`chat:${chatId}`).emit("chat:read", { chatId, userId });
+      } catch (err) {
+        console.error("❌ chat:read error:", err);
       }
     });
 
     socket.on("disconnect", () => {
-      console.log(`❌ ${role} disconnected: ${userId}`);
+      console.log(`🔴 ${email} (${role}) disconnected`);
     });
   });
 };

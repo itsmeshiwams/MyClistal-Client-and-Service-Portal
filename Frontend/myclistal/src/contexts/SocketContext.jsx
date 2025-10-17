@@ -1,52 +1,51 @@
 // src/contexts/SocketContext.jsx
-import React, { createContext, useContext, useEffect, useRef } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 
 const SocketContext = createContext(null);
 export const useSocket = () => useContext(SocketContext);
 
-/**
- * SocketProvider
- * - connects using token (backend authSocket expects token either in handshake.auth.token or Authorization header)
- * - passes socket instance via context
- */
 export const SocketProvider = ({ children }) => {
-  const { user } = useAuth(); // user should be { token, role, email }
-  const socketRef = useRef(null);
+  const { user } = useAuth(); // expected: { _id, token, role, email }
+  const [socket, setSocket] = useState(null);
 
   useEffect(() => {
-    // don't connect if no user
     if (!user?.token) return;
 
     const backend = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
-
-    // create socket with auth token so backend's authSocket can validate
-    const socket = io(backend, {
-      auth: {
-        token: user.token, // backend's authSocket expects socket.handshake.auth?.token
-      },
-      autoConnect: true,
+    const s = io(backend, {
+      auth: { token: user.token },
       transports: ["websocket", "polling"],
+      autoConnect: true,
     });
 
-    socketRef.current = socket;
+    s.on("connect", () => {
+      console.log("✅ Socket connected:", s.id);
 
-    socket.on("connect", () => {
-      // console.info("Socket connected", socket.id);
+      // Join personal room for this user (supports multi-tab)
+      if (user?._id) s.emit("join", { room: `user:${user._id}` });
+
+      // Join staff broadcast room if Staff
+      if (user?.role === "Staff") s.emit("join", { room: "staff-room" });
     });
 
-    socket.on("connect_error", (err) => {
-      console.error("Socket connect_error:", err.message);
-    });
+    s.on("disconnect", () => console.log("❌ Socket disconnected"));
+
+    s.on("connect_error", (err) =>
+      console.error("⚠️ Socket connect_error:", err.message)
+    );
+
+    // Optional: Debug all incoming events
+    // s.onAny((event, payload) => console.log("Socket event:", event, payload));
+
+    setSocket(s);
 
     return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
+      s.disconnect();
+      setSocket(null);
     };
-  }, [user?.token]);
+  }, [user?.token, user?._id, user?.role]);
 
-  return <SocketContext.Provider value={socketRef.current}>{children}</SocketContext.Provider>;
+  return <SocketContext.Provider value={socket}>{children}</SocketContext.Provider>;
 };

@@ -6,6 +6,7 @@ import {
   markMessagesRead,
   getOrCreatePrivateChat,
   searchChats,
+  searchUsers,
 } from "../controllers/chatController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
@@ -27,5 +28,7 @@ router.post("/:id/mark-read", markMessagesRead);
 
 // Presence
 router.get("/search", protect, searchChats);
+router.get("/search-users", protect, searchUsers);
+
 
 export default router;

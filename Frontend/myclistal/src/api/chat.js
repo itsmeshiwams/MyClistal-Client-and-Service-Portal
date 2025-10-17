@@ -2,7 +2,14 @@
 import API from "./api";
 
 // Note: backend routes are mounted under /chat
-export const getChats = () => API.get("/chat/getchats");
+// 🧠 Supports optional pagination
+export const getChats = (page, limit) => {
+  if (page && limit) {
+    return API.get(`/chat/getchats?page=${page}&limit=${limit}`);
+  }
+  return API.get("/chat/getchats");
+};
+
 export const getOrCreatePrivateChat = (targetUserId) =>
   API.post("/chat/privatemsg", { targetUserId });
 
@@ -17,3 +24,6 @@ export const markMessagesRead = (chatId) =>
 
 export const searchChats = (q) =>
   API.get(`/chat/search?q=${encodeURIComponent(q)}`);
+
+export const searchUsers = (q) =>
+  API.get(`/chat/search-users?q=${encodeURIComponent(q)}`);

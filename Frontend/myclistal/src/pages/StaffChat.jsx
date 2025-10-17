@@ -1,106 +1,81 @@
-// src/pages/StaffChat.jsx
-import React, { useEffect, useState, useCallback } from "react";
+import React from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useSocket } from "../contexts/SocketContext";
+import { useChatSync } from "../hooks/useChatSync";
 import ChatList from "../components/chat/ChatList";
 import ChatWindow from "../components/chat/ChatWindow";
 import ChatInput from "../components/chat/ChatInput";
-import { getChats, getMessages, sendMessage, markMessagesRead, getOrCreatePrivateChat, searchChats } from "../api/chat";
+import { ArrowDown } from "lucide-react";
 
 export default function StaffChat() {
   const { user } = useAuth();
   const socket = useSocket();
-  const [chats, setChats] = useState([]);
-  const [activeChat, setActiveChat] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [query, setQuery] = useState("");
 
-  const normalizeChats = useCallback((list = []) => {
-    return list.map((c) => ({
-      ...c,
-      meId: user?.id || user?._id || null,
-      meEmail: user?.email,
-    }));
-  }, [user]);
-
-  useEffect(() => { loadChats(); }, []);
-
-  useEffect(() => {
-    if (!socket) return;
-    const onNew = (payload) => {
-      const { chatId, message } = payload;
-      if (activeChat && activeChat._id === chatId) {
-        setMessages((m) => [...m, message]);
-        markMessagesRead(chatId).catch(() => {});
-      }
-      loadChats();
-    };
-
-    socket.on("message:new", onNew);
-    return () => {
-      socket.off("message:new", onNew);
-    };
-  }, [socket, activeChat]);
-
-  async function loadChats() {
-    try {
-      const res = await getChats();
-      setChats(normalizeChats(res.data));
-    } catch (err) {
-      console.error("loadChats error", err);
-    }
-  }
-
-  async function openChat(chat) {
-    setActiveChat(chat);
-    if (socket && chat?._id) socket.emit("chat:join", chat._id);
-    try {
-      const res = await getMessages(chat._id);
-      setMessages(res.data.messages || []);
-      await markMessagesRead(chat._id);
-      loadChats();
-    } catch (err) {
-      console.error("openChat getMessages", err);
-      setMessages([]);
-    }
-  }
-
-  async function handleSend(text) {
-    if (!activeChat) return;
-
-    const other = (activeChat.participants || []).find((p) => p.email !== user.email);
-    const recipientId = other ? other._id : null;
-
-    try {
-      const res = await sendMessage(activeChat._id, text, recipientId);
-      const serverMsg = res.data.message;
-      setMessages((m) => [...m, serverMsg]);
-      loadChats();
-    } catch (err) {
-      console.error("send error", err);
-    }
-  }
-
-  async function handleSearch(q) {
-    setQuery(q);
-    if (!q || q.trim().length === 0) {
-      loadChats();
-      return;
-    }
-    try {
-      const res = await searchChats(q);
-      setChats(normalizeChats(res.data));
-    } catch (err) {
-      console.error("searchChats error", err);
-    }
-  }
+  const {
+    chats,
+    activeChat,
+    messages,
+    query,
+    handleSearch,
+    openChat,
+    handleSend,
+    setChats,
+    currentUserId,
+    bindScroll,
+    scrollToBottom,
+    showJumpButton,
+    unreadCount,
+  } = useChatSync(socket, user, "Staff");
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[80vh]">
-      <ChatList chats={chats} activeChat={activeChat} onSelect={openChat} query={query} setQuery={handleSearch} role="Staff" />
-      <div className="col-span-2 flex flex-col">
-        <ChatWindow activeChat={activeChat} messages={messages} user={user} />
-        {activeChat && <ChatInput onSend={handleSend} placeholder="Message a client or staff..." />}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-4rem)] p-4 bg-gray-50 relative">
+      <div className="h-full overflow-hidden">
+        <ChatList
+          chats={chats}
+          activeChat={activeChat}
+          onSelect={openChat}
+          query={query}
+          setQuery={handleSearch}
+          role="Staff"
+        />
+      </div>
+
+      <div className="col-span-2 flex flex-col h-full bg-white rounded-xl shadow-md overflow-hidden relative">
+        <div ref={bindScroll} className="flex-1 overflow-y-auto">
+          <ChatWindow
+            activeChat={activeChat}
+            messages={messages}
+            user={user}
+            currentUserId={currentUserId}
+            onMarkRead={(chatId) =>
+              setChats((prev) =>
+                prev.map((c) =>
+                  c._id === chatId
+                    ? { ...c, unreadCount: 0, hasNewLocal: false }
+                    : c
+                )
+              )
+            }
+          />
+        </div>
+
+        {showJumpButton && (
+          <button
+            onClick={scrollToBottom}
+            className="absolute bottom-20 right-6 bg-blue-600 text-white px-3 py-2 rounded-full shadow-lg flex items-center gap-1 hover:bg-blue-700 transition"
+          >
+            <ArrowDown size={16} />
+            {unreadCount > 0 && (
+              <span className="text-xs bg-white text-blue-600 rounded-full px-2 py-0.5">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+        )}
+
+        {activeChat && (
+          <ChatInput onSend={handleSend} placeholder="Message client..." />
+        )}
       </div>
     </div>
   );

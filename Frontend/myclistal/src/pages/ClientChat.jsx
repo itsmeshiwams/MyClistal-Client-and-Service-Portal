@@ -1,117 +1,81 @@
-// src/pages/ClientChat.jsx
-import React, { useEffect, useState, useCallback } from "react";
+import React from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useSocket } from "../contexts/SocketContext";
+import { useChatSync } from "../hooks/useChatSync";
 import ChatList from "../components/chat/ChatList";
 import ChatWindow from "../components/chat/ChatWindow";
 import ChatInput from "../components/chat/ChatInput";
-import { getChats, getMessages, sendMessage, markMessagesRead, getOrCreatePrivateChat, searchChats } from "../api/chat";
+import { ArrowDown } from "lucide-react";
 
 export default function ClientChat() {
   const { user } = useAuth();
   const socket = useSocket();
-  const [chats, setChats] = useState([]);
-  const [activeChat, setActiveChat] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [query, setQuery] = useState("");
 
-  // attach meId and meEmail to each chat for easier UI
-  const normalizeChats = useCallback((list = []) => {
-    return list.map((c) => ({
-      ...c,
-      meId: user?.id || user?._id || null,
-      meEmail: user?.email,
-    }));
-  }, [user]);
-
-  useEffect(() => { loadChats(); }, []);
-
-  useEffect(() => {
-    if (!socket) return;
-    const onNew = (payload) => {
-      // backend emits { chatId, message }
-      const { chatId, message } = payload;
-      // add message to active chat if matches
-      if (activeChat && activeChat._id === chatId) {
-        setMessages((m) => [...m, message]);
-        // mark read
-        markMessagesRead(chatId).catch(() => {});
-      }
-      // refresh chats to update lastMessage/unread
-      loadChats();
-    };
-
-    socket.on("message:new", onNew);
-    return () => {
-      socket.off("message:new", onNew);
-    };
-  }, [socket, activeChat]);
-
-  async function loadChats() {
-    try {
-      const res = await getChats();
-      setChats(normalizeChats(res.data));
-    } catch (err) {
-      console.error("loadChats error", err);
-    }
-  }
-
-  async function openChat(chat) {
-    setActiveChat(chat);
-    // join socket room
-    if (socket && chat?._id) socket.emit("chat:join", chat._id);
-    try {
-      const res = await getMessages(chat._id);
-      setMessages(res.data.messages || []);
-      // mark read on open
-      await markMessagesRead(chat._id);
-      // refresh chat list (unread counts)
-      loadChats();
-    } catch (err) {
-      console.error("openChat getMessages", err);
-      setMessages([]);
-    }
-  }
-
-  async function handleSend(text) {
-    if (!activeChat) return;
-
-    // determine recipientId for private chat
-    const other = (activeChat.participants || []).find((p) => p.email !== user.email);
-    const recipientId = other ? other._id : null;
-
-    try {
-      const res = await sendMessage(activeChat._id, text, recipientId);
-      // backend returns message in res.data.message
-      const serverMsg = res.data.message;
-      setMessages((m) => [...m, serverMsg]);
-      // refresh chats
-      loadChats();
-    } catch (err) {
-      console.error("send error", err);
-    }
-  }
-
-  async function handleSearch(q) {
-    setQuery(q);
-    if (!q || q.trim().length === 0) {
-      loadChats();
-      return;
-    }
-    try {
-      const res = await searchChats(q);
-      setChats(normalizeChats(res.data));
-    } catch (err) {
-      console.error("searchChats error", err);
-    }
-  }
+  const {
+    chats,
+    activeChat,
+    messages,
+    query,
+    handleSearch,
+    openChat,
+    handleSend,
+    setChats,
+    currentUserId,
+    bindScroll,
+    scrollToBottom,
+    showJumpButton,
+    unreadCount,
+  } = useChatSync(socket, user, "Client");
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 h-full gap-6 ">
-      <ChatList chats={chats} activeChat={activeChat} onSelect={openChat} query={query} setQuery={handleSearch} role="Client" />
-      <div className="col-span-2 flex flex-col">
-        <ChatWindow activeChat={activeChat} messages={messages} user={user} />
-        {activeChat && <ChatInput onSend={handleSend} placeholder="Message the staff..." />}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-4rem)] p-4 bg-gray-50 relative">
+      <div className="h-full overflow-hidden">
+        <ChatList
+          chats={chats}
+          activeChat={activeChat}
+          onSelect={openChat}
+          query={query}
+          setQuery={handleSearch}
+          role="Client"
+        />
+      </div>
+
+      <div className="col-span-2 flex flex-col h-full bg-white rounded-xl shadow-md overflow-hidden relative">
+        <div ref={bindScroll} className="flex-1 overflow-y-auto">
+          <ChatWindow
+            activeChat={activeChat}
+            messages={messages}
+            user={user}
+            currentUserId={currentUserId}
+            onMarkRead={(chatId) =>
+              setChats((prev) =>
+                prev.map((c) =>
+                  c._id === chatId
+                    ? { ...c, unreadCount: 0, hasNewLocal: false }
+                    : c
+                )
+              )
+            }
+          />
+        </div>
+
+        {showJumpButton && (
+          <button
+            onClick={scrollToBottom}
+            className="absolute bottom-20 right-6 bg-blue-600 text-white px-3 py-2 rounded-full shadow-lg flex items-center gap-1 hover:bg-blue-700 transition"
+          >
+            <ArrowDown size={16} />
+            {unreadCount > 0 && (
+              <span className="text-xs bg-white text-blue-600 rounded-full px-2 py-0.5">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+        )}
+
+        {activeChat && (
+          <ChatInput onSend={handleSend} placeholder="Message staff..." />
+        )}
       </div>
     </div>
   );

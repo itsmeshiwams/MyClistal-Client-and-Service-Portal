@@ -9,17 +9,14 @@ export default function Chat() {
   const { user } = useAuth();
 
   return (
-    <div className="flex">
-      {/* Sidebar Section (sticky left) */}
-      <div className="h-full sticky bottom-0 top-0">
+    <div className="flex h-screen bg-white">
+      <div className="h-screen sticky top-0">
         <Sidebar />
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col ">
+      <div className="flex-1 flex flex-col">
         <Navbar />
-
-        <main className="flex-1 min-h-screen">
+        <main className="flex-1 overflow-hidden">
           {user?.role === "Client" ? <ClientChat /> : <StaffChat />}
         </main>
       </div>
