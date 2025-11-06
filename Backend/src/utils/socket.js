@@ -1,4 +1,4 @@
-// backend/utils/socket.js
+// src/utils/socket.js
 let ioInstance = null;
 
 export const setIO = (io) => {
@@ -11,3 +11,5 @@ export const getIO = () => {
   }
   return ioInstance;
 };
+
+export default { setIO, getIO };

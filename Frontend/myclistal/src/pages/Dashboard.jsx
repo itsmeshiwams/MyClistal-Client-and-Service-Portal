@@ -3,8 +3,8 @@ import { fetchDashboard } from "../api/dashboard";
 import { useAuth } from "../contexts/AuthContext";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
-import ClientDashboard from "./ClientDashboard";
-import StaffDashboard from "./StaffDashboard";
+import ClientDashboard from "./ClientPages/ClientDashboard";
+import StaffDashboard from "./StaffPages/StaffDashboard";
 
 export default function Dashboard() {
   const { user } = useAuth();

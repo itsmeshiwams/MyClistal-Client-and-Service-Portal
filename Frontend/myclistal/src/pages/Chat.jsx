@@ -2,8 +2,8 @@
 import { useAuth } from "../contexts/AuthContext";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
-import ClientChat from "./ClientChat";
-import StaffChat from "./StaffChat";
+import ClientChat from "./ClientPages/ClientChat";
+import StaffChat from "./StaffPages/StaffChat";
 
 export default function Chat() {
   const { user } = useAuth();

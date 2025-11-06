@@ -211,7 +211,7 @@ const seedDatabase = async () => {
       { email: "sophie.nz@example.com", password: hashedPassword, role: "Client" },
       { email: "liam.nz@example.com", password: hashedPassword, role: "Client" },
       { email: "mia.nz@example.com", password: hashedPassword, role: "Client" },
-      { email: "noah.nz@example.com", password: hashedPassword, role: "Client" },
+      { email: "supremebhattarai497@gmail.com", password: hashedPassword, role: "Client" },
     ]);
 
     const staffUsers = await User.insertMany([

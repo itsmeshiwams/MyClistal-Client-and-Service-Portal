@@ -6,34 +6,60 @@ import connectDB from "./config/db.js";
 import app from "./app.js";
 import { setIO } from "./utils/socket.js";
 import { initChatSocket } from "./sockets/chatSocket.js";
+import { initCalendarSocket } from "./sockets/calendarSocket.js";
+import { authSocket } from "./middleware/authSocket.js";
+import cron from "node-cron";
+
 
 dotenv.config();
 
-// ✅ Connect DB first
-connectDB().then(() => {
-  // ✅ Create HTTP server using the same Express app
-  const server = http.createServer(app);
+// ✅ Initialize server inside DB connection to avoid race conditions
+connectDB()
+  .then(() => {
+    const server = http.createServer(app);
 
-  // ✅ Setup Socket.IO
-  const io = new Server(server, {
-    cors: {
-      origin: process.env.FRONTEND_URL || "*",
-      methods: ["GET", "POST"],
-    },
+    // ✅ Configure Socket.IO
+    const io = new Server(server, {
+      cors: {
+        origin: process.env.FRONTEND_URL || "http://localhost:5173",
+        methods: ["GET", "POST"],
+        credentials: true,
+      },
+    });
+
+    // ✅ Use JWT socket authentication
+    io.use(authSocket);
+
+    // ✅ Make io globally accessible
+    setIO(io);
+
+    // ✅ Initialize socket modules
+    initChatSocket(io);
+    initCalendarSocket(io);
+    initTaskSocket(io);
+
+
+    // ✅ Start server
+    const PORT = process.env.PORT || 5001;
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+
+    io.on("connection_error", (err) => {
+      console.error("⚡ Socket Connection Error:", err.message);
+    });
+
+    cron.schedule("0 * * * *", async () => {
+      console.log("🕒 Running hourly event status updater...");
+      await updateEventStatuses();
+    });
+  })
+  .catch((err) => {
+    console.error("❌ Failed to start server:", err.message);
+    process.exit(1);
   });
 
-  // 🔌 Make io globally accessible
-  setIO(io);
-
-  // 🔥 Initialize Chat Socket Events
-  initChatSocket(io);
-
-  // ✅ Start Server
-  const PORT = process.env.PORT || 5000;
-  server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-});
-
-// ✅ Handle unexpected crashes safely
+// ✅ Catch fatal async rejections
 process.on("unhandledRejection", (err) => {
   console.error("💥 Unhandled Rejection:", err);
   process.exit(1);

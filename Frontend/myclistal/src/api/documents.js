@@ -11,7 +11,7 @@ import api from "./api";
  *  GET  /document/:id/download
  */
 
-const BASE_URL = "http://localhost:5000/document";
+const BASE_URL = "http://localhost:5001/document";
 
 // ✅ Build consistent query params
 const buildParams = ({

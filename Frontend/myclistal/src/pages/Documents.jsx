@@ -4,8 +4,8 @@ import { fetchDocuments } from "../api/documents";
 import { useAuth } from "../contexts/AuthContext";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
-import ClientDocument from "./ClientDocument";
-import StaffDocument from "./StaffDocument";
+import ClientDocument from "./ClientPages/ClientDocument";
+import StaffDocument from "./StaffPages/StaffDocument";
 
 export default function Documents() {
   const { user } = useAuth();
