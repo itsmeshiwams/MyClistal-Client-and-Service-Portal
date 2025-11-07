@@ -219,7 +219,7 @@ const seedDatabase = async () => {
       { email: "jack.staff@example.com", password: hashedPassword, role: "Staff" },
       { email: "ava.staff@example.com", password: hashedPassword, role: "Staff" },
       { email: "lucas.staff@example.com", password: hashedPassword, role: "Staff" },
-      { email: "harper.staff@example.com", password: hashedPassword, role: "Staff" },
+      { email: "supremebhattarai49710@gmail.com", password: hashedPassword, role: "Staff" },
     ]);
 
     console.log(`✅ Seeded ${clientUsers.length} clients & ${staffUsers.length} staff`);

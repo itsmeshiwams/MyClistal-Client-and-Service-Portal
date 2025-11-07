@@ -10,7 +10,7 @@ import dashboardRoutes from "./routes/dashboardRoutes.js";
 import documentRoutes from "./routes/documentRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import calendarRoutes from "./routes/calendarRoutes.js"; // <-- new
-
+import taskRoutes from "./routes/taskRoutes.js"; // <-- new
 const app = express();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -29,5 +29,6 @@ app.use("/dashboard", dashboardRoutes);
 app.use("/document", documentRoutes);
 app.use("/chat", chatRoutes);
 app.use("/calendar", calendarRoutes); // <-- mount calendar
+app.use("/tasks", taskRoutes); // <-- mount calendar
 
 export default app;

@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "seed": "node seed.js",
-    "seed1": "node seed1.js"
+    "seedall": "node seed.js && node taskSeed.js && node seed1.js"
   },
   "dependencies": {
     "@microsoft/microsoft-graph-client": "^3.0.7",

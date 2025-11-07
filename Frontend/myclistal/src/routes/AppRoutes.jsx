@@ -7,6 +7,8 @@ import ProtectedRoute from "./ProtectedRoute";
 import Documents from "../pages/Documents";
 import Chat from "../pages/Chat";
 import Calendar from "../pages/Calendar";
+import TasksPage from "../pages/Tasks";
+
 
 export default function AppRoutes() {
   return (
@@ -44,7 +46,14 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
-
+      <Route
+        path="/tasks"
+        element={
+          <ProtectedRoute allowedRoles={["Client", "Staff"]}>
+            <TasksPage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

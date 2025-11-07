@@ -7,6 +7,7 @@ import app from "./app.js";
 import { setIO } from "./utils/socket.js";
 import { initChatSocket } from "./sockets/chatSocket.js";
 import { initCalendarSocket } from "./sockets/calendarSocket.js";
+import { initTaskSocket } from "./sockets/taskSocket.js";
 import { authSocket } from "./middleware/authSocket.js";
 import cron from "node-cron";
 
