@@ -7,6 +7,7 @@ import TaskTable from "../components/tasks/TaskTable";
 import TaskModal from "../components/tasks/TaskModal";
 import TaskDetailsSidebar from "../components/tasks/TaskDetailsSidebar";
 import { useAuth } from "../contexts/AuthContext";
+import { Plus, RefreshCcwIcon } from "lucide-react";
 
 export default function TasksPage() {
   const [openModal, setOpenModal] = useState(false);
@@ -39,16 +40,16 @@ export default function TasksPage() {
             </div>
             <div className="flex items-center gap-3">
               <button
-                className="bg-white border border-gray-400 cursor-pointer px-3 py-2 rounded-lg hover:bg-gray-100 transition"
+                className=" cursor-pointer px-3 py-2 rounded-full hover:bg-gray-100 transition hover:scale-105"
                 onClick={() => setRefreshKey((k) => k + 1)}
               >
-                Refresh
+                <RefreshCcwIcon className="w-5 h-5 text-blue-800" />
               </button>
               <button
-                className="bg-blue-800 text-white px-4 py-2 cursor-pointer rounded-lg hover:bg-blue-900 transition"
                 onClick={() => setOpenModal(true)}
+                className="inline-flex items-center gap-2 bg-blue-800 text-white px-3 py-2 rounded-lg shadow-md text-base font-semibold hover:bg-blue-900 transition-all cursor-pointer"
               >
-                Add Task
+                <Plus size={18} /> Add Task
               </button>
             </div>
           </div>

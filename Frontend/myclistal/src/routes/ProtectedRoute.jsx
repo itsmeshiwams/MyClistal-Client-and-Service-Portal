@@ -1,27 +1,30 @@
-// src/routes/ProtectedRoute.jsx
 import React from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
-/**
- * ProtectedRoute
- * Props:
- *  - children: JSX
- *  - allowedRoles?: array of roles allowed (e.g. ['Client'])
- *
- * If not logged in -> redirect to "/"
- * If role not allowed -> redirect to "/dashboard" (or wherever you prefer)
- */
 export default function ProtectedRoute({ children, allowedRoles }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const location = useLocation();
 
-  if (!user) {
-    return <Navigate to="/" replace />;
+  // Show nothing while restoring session to avoid flicker
+  if (loading) return null;
+
+  // Fallback to localStorage after refresh
+  const localToken = localStorage.getItem("token");
+  const localRole = localStorage.getItem("role");
+  const localEmail = localStorage.getItem("email");
+
+  const currentUser =
+    user || (localToken ? { token: localToken, role: localRole, email: localEmail } : null);
+
+  // If not logged in, redirect to login
+  if (!currentUser) {
+    return <Navigate to="/" replace state={{ from: location }} />;
   }
 
+  // If role is restricted and user is not allowed, redirect to dashboard
   if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {
-    if (!allowedRoles.includes(user.role)) {
-      // role not allowed
+    if (!allowedRoles.includes(currentUser.role)) {
       return <Navigate to="/dashboard" replace />;
     }
   }
