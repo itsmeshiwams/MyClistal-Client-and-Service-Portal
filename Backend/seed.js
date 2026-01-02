@@ -207,11 +207,11 @@ const seedDatabase = async () => {
     const hashedPassword = await bcrypt.hash("password123", 10);
 
     const clientUsers = await User.insertMany([
-      { email: "oliver.nz@example.com", password: hashedPassword, role: "Client" },
+      { email: "shiwams.nz@example.com", password: hashedPassword, role: "Client" },
       { email: "sophie.nz@example.com", password: hashedPassword, role: "Client" },
       { email: "liam.nz@example.com", password: hashedPassword, role: "Client" },
       { email: "mia.nz@example.com", password: hashedPassword, role: "Client" },
-      { email: "supremebhattarai497@gmail.com", password: hashedPassword, role: "Client" },
+      { email: "shiwamsphuyal@gmail.com", password: hashedPassword, role: "Client" },
     ]);
 
     const staffUsers = await User.insertMany([
@@ -219,7 +219,7 @@ const seedDatabase = async () => {
       { email: "jack.staff@example.com", password: hashedPassword, role: "Staff" },
       { email: "ava.staff@example.com", password: hashedPassword, role: "Staff" },
       { email: "lucas.staff@example.com", password: hashedPassword, role: "Staff" },
-      { email: "supremebhattarai49710@gmail.com", password: hashedPassword, role: "Staff" },
+      { email: "shiwams@gmail.com", password: hashedPassword, role: "Staff" },
     ]);
 
     console.log(`✅ Seeded ${clientUsers.length} clients & ${staffUsers.length} staff`);
