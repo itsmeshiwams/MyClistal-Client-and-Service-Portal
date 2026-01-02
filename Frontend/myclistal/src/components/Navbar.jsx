@@ -19,7 +19,7 @@ export default function Navbar() {
         </span>
         <button
           onClick={logout}
-          className="flex items-center gap-2 text-white cursor-pointer bg-blue-800 px-3 py-2 rounded-lg hover:bg-blue-900 transition"
+          className="flex items-center gap-3 text-white cursor-pointer bg-blue-900 px-3 py-2 rounded-lg hover:bg-blue-900 transition"
         >
           <LogOut size={20} />
         </button>
