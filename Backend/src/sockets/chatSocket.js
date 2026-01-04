@@ -21,7 +21,7 @@ export const initChatSocket = (io) => {
           chats.forEach((c) => socket.join(`chat:${c._id}`));
           console.log(`🟦 Staff ${email} auto-joined ${chats.length} rooms`);
         })
-        .catch((err) => console.error("Auto join failed:", err.message));
+        .catch((err) => console.error("Auto change failed please try again please", err.message));
     }
 
     /**
